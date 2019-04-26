@@ -63,42 +63,40 @@ class Generator(object):
 
 
     def generate_balance(self):
-        pos_list=[]
-        neg_list=[]
+        data={}
         for l in self.len_pool:
             for i in range(self.max_size_per_len):
                 if l==0:
-                    pos_list.append("")
+                    data[""]=True
                     break
                 if self.dfa.get_re()=="1*" or self.dfa.get_re()=="(10)*":
                     if i >= self.ub_neg_num:
                         break
-                pos = self.dfa.generatePos(l,pos_list,self.max_iteries)
-                neg=self.dfa.generateNeg(l,neg_list,self.max_iteries)
-                if pos not in pos_list and len(pos)>0:
-                    pos_list.append(pos)
-                if neg not in neg_list and len(neg)>0:
-                    neg_list.append(neg)
-        return pos_list,neg_list
+                pos = self.dfa.generatePos(l,data.keys(),self.max_iteries)
+                neg=self.dfa.generateNeg(l,data.keys(),self.max_iteries)
+                if pos not in data.keys() and len(pos)>0:
+                    data[pos]=True
+                if neg not in data.keys() and len(neg)>0:
+                    data[neg]=False
+        return data
 
 
     def generate_random(self,data_size):
-        pos_list=[]
-        neg_list=[]
+        data={}
         random.seed(20190101)
         for i in range(data_size):
             while True:
                 l = random.choice(self.len_pool)
                 seq,label=self.dfa.random_word(l,start=self.dfa.get_start(),alphabet=self.dfa.get_alphabet())
-                if seq not in pos_list and seq not in neg_list:
+                if seq not in data.keys():
                     if label is True:
-                        pos_list.append(seq)
+                        data[seq]=True
                     else:
-                        neg_list.append(seq)
+                        data[seq]=False
                     break
-        return pos_list,neg_list
+        return data
 
-    def save_data(self,save_path,pos_list,neg_list):
+    def save_data(self,save_path,data):
         '''
         save data into a pickle file: {"data":{"str":lable},"num_pos":int,"num_neg":int}
         :param save_path:
@@ -107,13 +105,13 @@ class Generator(object):
         :return:
         '''
         with open(save_path,"wb") as f:
-            data_pos = {str:True for str in pos_list}
-            data_neg = {str:False for str in neg_list}
-            print("{}({})".format(len(data_pos) + len(data_neg), len(data_pos)))
-            data = dict(data_pos.items()+data_neg.items())
+            num_pos=len([seq for seq in data.keys() if data[seq]==True])
+            num_neg=len([seq for seq in data.keys() if data[seq]==False])
+            assert num_neg+num_pos==len(data)
+            print("{}({})".format(len(data), num_pos))
             pickle.dump({"data":data,
-                         "num_pos":len(pos_list),
-                         "num_neg":len(neg_list)},f)
+                         "num_pos":num_pos,
+                         "num_neg":num_neg},f)
 
 
 class TomitaDataProcessor(object):
@@ -164,8 +162,8 @@ def make_training_set():
         ub_neg_num = 50
 
         g=Generator(grammar,len_pool,max_iteries,max_size_per_len,ub_neg_num)
-        pos_list,neg_list=g.generate_balance()
-        g.save_data(save_path,pos_list,neg_list)
+        data=g.generate_balance()
+        g.save_data(save_path,data)
 
 
 def make_test_set():
@@ -180,8 +178,8 @@ def make_test_set():
         test_data_size = 1000
 
         g=Generator(grammar,len_pool,max_iteries,max_size_per_len,ub_neg_num)
-        pos_list,neg_list=g.generate_random(test_data_size)
-        g.save_data(save_path,pos_list,neg_list)
+        data=g.generate_random(test_data_size)
+        g.save_data(save_path,data)
 
 
 if __name__=="__main__":
