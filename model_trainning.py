@@ -1,24 +1,28 @@
+from __future__ import division
 import sys, os
 import argparse
+
 sys.path.append('./')
 import torch
 import pickle
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from models.gated_rnn import LSTM, GRU,GRU2
-from data_process.imdb_sentiment.imdb_data_process import IMDB_Data_Processor
+from rnn_models.rnn_arch.gated_rnn import LSTM, GRU, GRU2, GRU3,GRU3WrappperDFA
 from utils.time_util import current_timestamp
 import pickle
 from utils.constant import *
 import numpy as np
 import math
-from data_process.tomita.generator import TomitaDataProcessor
-
-
-
-def adjust_learing_rate(optimizer,lr,epoch,step):
-    new_lr = lr*(0.1**(epoch//step))
+from data_factory.tomita.generator import TomitaDataProcessor
+from data_factory.fuel_consum.fcsmpDataProcessor import FCSMP_Data_Processor
+from data_factory.bp.bp_processor import *
+from data_factory.imdb_sentiment.imdb_data_process import *
+import gensim
+import copy
+def adjust_learing_rate(optimizer, lr, epoch, step):
+    new_lr = lr * (0.1 ** (epoch // step))
+    print("new learning rate:{}".format(new_lr))
     for param_group in optimizer.param_groups:
         param_group["lr"] = new_lr
 
@@ -72,6 +76,52 @@ def test_accuracy_batch(rnn, test_data, dataProcessor, input_dim, num_class, use
     rst = "acc:{:.2f}({}/{})".format(correct * 1. / len(test_data), correct, len(test_data))
     return rst
 
+def tets_accuracy_concise(rnn,test_data,cuda_no):
+    '''
+
+    :param rnn:
+    :param test_data: list(tuple)
+    :return:
+    '''
+    rnn.eval()
+    if cuda_no >=0:
+        rnn = rnn.cuda(cuda_no)
+    data_size = len(test_data)
+    cnt = 0
+    for words,label in test_data:
+        pdt=rnn.classify_word(words,cuda_no)
+        if pdt==label:
+            cnt+=1
+    acc = cnt/data_size
+    descr = "acc:{:.2f}({}/{})".format(acc, cnt, data_size)
+    return descr, round(acc, 4)
+
+def tets_accuracy_concise_with_clean_data(rnnWrapper,test_data,cuda_no):
+    '''
+
+    :param rnn:
+    :param test_data: list(tuple)
+    :return:
+    '''
+    rnnWrapper.eval()
+    if cuda_no >=0:
+         rnnWrapper.cuda(cuda_no)
+    data_size = len(test_data)
+    cnt = 0
+    for words in test_data:
+        bkp = copy.deepcopy(words)
+        pdt=rnnWrapper.classify_word(words,cuda_no)
+        if words==bkp:
+            print("No change")
+        if pdt==test_data[words]:
+            cnt+=1
+    acc = cnt/data_size
+    descr = "acc:{:.2f}({}/{})".format(acc, cnt, data_size)
+    return descr, round(acc, 4)
+
+
+
+
 
 def test_accuracy(rnn, test_data, dataProcessor, input_dim, num_class, cuda_no, RNN_TYPE=MTYPE_SRNN):
     '''
@@ -90,8 +140,16 @@ def test_accuracy(rnn, test_data, dataProcessor, input_dim, num_class, cuda_no, 
     batch_size = 1
     if cuda_no != -1:
         rnn = rnn.cuda(cuda_no)
-    for sequence in test_data.keys():
-        label = test_data[sequence]
+
+    data_list = test_data.keys() if isinstance(test_data, dict) else test_data
+    for sequence in data_list:
+        if isinstance(test_data, dict):
+            label = test_data[sequence]
+        else:
+            # tuple
+            label = sequence[1]
+            sequence = sequence[0]  # list
+
         tensor_sequence = dataProcessor.sequence2tensor(sequence, input_dim)  # Lx1xn_letters
         if cuda_no != -1:
             tensor_sequence = tensor_sequence.cuda(cuda_no)
@@ -106,36 +164,53 @@ def test_accuracy(rnn, test_data, dataProcessor, input_dim, num_class, cuda_no, 
     return descr, round(acc, 4)
 
 
-def train_with_optim(rnn, lr, epocs, train_data, test_data, dataProcessor, cuda_no=-1, input_dim=2, num_class=2,
-                     RNN_TYPE=MTYPE_SRNN, lower_bound_acc=0.9,lr_decay=False):
-    watch_step = 100
+def train_with_optim(rnn, lr, epocs, train_data, test_data=None, dataProcessor=None, cuda_no=-1, input_dim=2, num_class=2,
+                     RNN_TYPE=MTYPE_SRNN, lower_bound_acc=0.9, lr_decay=True):
+
+    def ouput_info(train_descr,test_descr):
+        train_info = current_timestamp() + '****************======>Init train_acc:' + str(train_descr)
+        train_info += 'Test acc:' + str(test_descr) if test_descr is not None else "NO TEST DATA"
+        return train_info
+
+
+    watch_step = 500
     average_loss = 0
     optim = torch.optim.Adam(rnn.parameters(), lr)
 
-    test_descr, test_acc = test_accuracy(rnn, test_data, dataProcessor, input_dim, num_class, cuda_no,
-                                         RNN_TYPE=RNN_TYPE)
     train_descr, train_acc = test_accuracy(rnn, train_data, dataProcessor, input_dim, num_class, cuda_no,
                                            RNN_TYPE=RNN_TYPE)
-    print(current_timestamp() + '****************======>Init train_acc:' + str(train_descr) + 'Init test acc:' + str(
-        test_acc))
+    if test_data is not None:
+        test_descr, test_acc = test_accuracy(rnn, test_data, dataProcessor, input_dim, num_class, cuda_no,
+                                             RNN_TYPE=RNN_TYPE)
+    else:
+        test_descr = None
+
+    train_info=ouput_info(train_descr, test_descr)
+    print(train_info)
 
     rnn.train()
     if cuda_no != -1:
         rnn = rnn.cuda(cuda_no)
     for epoc in range(epocs):
         count = 0
-        if lr_decay and lr>1e-5:
+        if lr_decay and lr > 1e-6:
             adjust_learing_rate(optim, lr, epoc, 40)
-        for sequence in train_data.keys():
-            label = train_data[sequence]
+
+        data_list = train_data.keys() if isinstance(train_data, dict) else train_data
+        for sequence in data_list:
+            if isinstance(train_data, dict):
+                label = train_data[sequence]
+            else:
+                # tuple
+                label = sequence[1]
+                sequence = sequence[0]  # list
+
             tensor_sequence = dataProcessor.sequence2tensor(sequence, input_dim)  # Lx1xn_letters
             ground_truth = torch.LongTensor([label])
             if cuda_no != -1:
-                tensor_sequence, ground_truth = tensor_sequence.cuda(), ground_truth.cuda(cuda_no)
+                tensor_sequence, ground_truth = tensor_sequence.cuda(cuda_no), ground_truth.cuda(cuda_no)
 
             optim.zero_grad()
-            # output, states = forware_pass(rnn, tensor_sequence, RNN_TYPE)
-            # pr_distr = output[0][-1].unsqueeze(0)
             output, hx = forware_pass(rnn, tensor_sequence, RNN_TYPE)
             pr_dstr = rnn.output_pr_dstr(hx[-1])
             loss = F.nll_loss(pr_dstr, ground_truth)
@@ -147,17 +222,36 @@ def train_with_optim(rnn, lr, epocs, train_data, test_data, dataProcessor, cuda_
                 print("epoc:{},sampels:{},loss:{}".format(epoc, count, average_loss / watch_step))
                 average_loss = 0
 
-        test_descr, test_acc = test_accuracy(rnn, test_data, dataProcessor, input_dim, num_class, cuda_no,
-                                             RNN_TYPE=RNN_TYPE)
         train_descr, train_acc = test_accuracy(rnn, train_data, dataProcessor, input_dim, num_class, cuda_no,
-                                               RNN_TYPE=RNN_TYPE)
-        print(current_timestamp() + '****************======>train_acc:' + str(
-            train_descr) + 'test acc:' + str(test_descr))
+                                                   RNN_TYPE=RNN_TYPE)
+        if test_data is not None:
+            test_descr, test_acc = test_accuracy(rnn, test_data, dataProcessor, input_dim, num_class, cuda_no,
+                                                 RNN_TYPE=RNN_TYPE)
+        else:
+            test_descr = None
+
+        train_info = ouput_info(train_descr, test_descr)
+        print(train_info)
+
         rnn.train()
-        if test_acc >= lower_bound_acc and train_acc >= lower_bound_acc:
-            return train_acc, test_acc
+        if train_acc >= lower_bound_acc:
+            if test_data is not None:
+                if test_acc >= lower_bound_acc:
+                    return train_acc, test_acc
+            else:
+                return train_acc
+    test_descr, test_acc = test_accuracy(rnn, test_data, dataProcessor, input_dim, num_class, cuda_no,
+                                         RNN_TYPE=RNN_TYPE)
+    train_descr, train_acc = test_accuracy(rnn, train_data, dataProcessor, input_dim, num_class, cuda_no,
+                                           RNN_TYPE=RNN_TYPE)
+
     print('Warning:Training Failed!!!!!Can not make model\'s accuracy to be {}!'.format(lower_bound_acc))
-    return train_acc, test_acc
+    if train_acc >= lower_bound_acc:
+        if test_data is not None:
+            if test_acc >= lower_bound_acc:
+                return train_acc, test_acc
+        else:
+            return train_acc
 
 
 def train_with_optim_batch(rnn, lr, epocs, train_data, test_data, dataProcessor,
@@ -336,133 +430,229 @@ def train_imdb(params, data_id, cuda_no):
 
 
 def train_tomita(params, cuda_no):
-
-    with open(params["datapath"],"rb") as f:
-        data = pickle.load(f)
-    pos_data,pos_labels = data["pos"]
-    neg_data,neg_labels = data["neg"]
-
-    total_data=np.concatenate((pos_data,neg_data))
-    total_label=np.concatenate((pos_labels,neg_labels))
-
-    #shuffle
-    idcies=range(len(total_data))
-    np.random.shuffle(idcies)
-    total_data = total_data[idcies]
-    total_label = total_label[idcies]
-
-    # split  5:1 train to test
-    import math
-    train_size = int(math.floor(0.8*len(total_data)))
-    train_data = total_data[:train_size]
-    train_label = total_label[:train_size]
-
-    test_data = total_data[train_size:]
-    test_label = total_label[train_size:]
-
-    test_data = {sequence:label for sequence,label in zip(test_data,test_label)}
-    train_data =  {sequence:label for sequence,label in zip(train_data,train_label)}
-
-    print("Training Data:pos({})".format(sum(train_label)))
-    print("Testing Data:pos({})".format(sum(test_label)))
-
-    with open( params["split_data_path"],"wb") as f:
-        pickle.dump({"train":train_data,"test":test_data},f)
-
     torch.random.manual_seed(199312)
     dataProcessor = TomitaDataProcessor()
 
-    rnn=GRU2(raw_input_size=2,innder_input_dim=3,num_class=2,hidden_size=params["hidden_size"],num_layers=2,dataProcessor=dataProcessor)
+    train_data = dataProcessor.load_data(params["train_data_path"])
+    test_data = None if params["test_data_path"] is None else dataProcessor.load_data(params["test_data_path"])
+    print("Train Size:{},Test Size:{}".format(len(train_data), 0 if test_data is None else len(test_data)))
 
-    descr, acc=test_accuracy(rnn, test_data, dataProcessor, 2, 2, -1,RNN_TYPE=MTYPE_GRU)
-    print("Before Learing:{}".format(descr))
+    rnn = GRU2(raw_input_size=params["alphabet_size"], innder_input_dim=3, num_class=2,
+               hidden_size=params["hidden_size"], num_layers=2, dataProcessor=dataProcessor)
 
-
-    print("Begine Training......")
+    print("Begin Training......")
     train_acc, test_acc = train_with_optim(rnn, params["lr"], params["epocs"], train_data, test_data, dataProcessor,
                                            cuda_no=cuda_no,
-                                           input_dim=2,
+                                           input_dim=params["alphabet_size"],
                                            RNN_TYPE=params["rnn_type"],
                                            lower_bound_acc=params["min_acc"],
                                            lr_decay=params["lr_decay"])
 
-    print("training acc:{},testing acc:{}".format(train_acc,test_acc))
+    print("training acc:{},testing acc:{}".format(train_acc, test_acc))
 
-    with open(params["model_save"],"wb") as f:
-        pickle.dump(rnn.cpu(),f)
-
+    with open(params["model_save"], "wb") as f:
+        pickle.dump(rnn.cpu(), f)
     return rnn
 
-if __name__ == "__main__":
-    # import gensim
-    #
-    # ###############
-    # # load word2vec
-    # ###############
-    # word2vec_model_path = "/home/dgl/project/pfa-data-generator/models/pretrained/GoogleNews-vectors-negative300.bin"
-    # stop_words_list_path = "/home/dgl/project/pfa-data-generator/data/stopwords.txt"
-    # print('loading word2vector model....')
-    # word2vec_model = gensim.models.KeyedVectors.load_word2vec_format(
-    #     word2vec_model_path, binary=True)
-    # dataProcessor = IMDB_Data_Processor(word2vec_model, stop_words_list_path)
-    #
+
+def train_FCSMP(params, cuda_no):
+    dataProcessor = FCSMP_Data_Processor()
+    train_data, test_data = dataProcessor.load_data(params["data_root"], params["train_number"])
+
+    print('Training {} with Number:{}....'.format(params["rnn_type"], len(train_data)))
+    if params["rnn_type"] == MTYPE_GRU:
+        rnn = GRU3(raw_input_size=params["raw_input_size"], input_size=params["inner_input_size"],
+                   num_class=params["output_size"], hidden_size=params["hidden_size"],
+                   num_layers=params["num_layers"])
+
+    else:
+        raise Exception("Unknow rnn type:{}".format(params["rnn_type"]))
+
+    train_acc, test_acc = train_with_optim(rnn, params["lr"], params["epocs"], train_data, test_data, dataProcessor,
+                                           cuda_no=cuda_no,
+                                           input_dim=params["raw_input_size"],
+                                           RNN_TYPE=params["rnn_type"],
+                                           lower_bound_acc=params["min_acc"])
+
+    save_path = os.path.join(params["model_save_root"],
+                             params["rnn_type"] + '-train_acc-' + str(train_acc) + '-test_acc-' + str(
+                                 test_acc) + '.pkl')
+    with open(save_path, 'wb') as f:
+        pickle.dump(rnn, f)
+
+    print('Done!')
+
+def train_bp(params, cuda_no):
+    torch.random.manual_seed(199312)
+    dataProcessor = BPProcessor()
+
+    train_data = dataProcessor.load_data(params["train_data_path"])
+    test_data = None if params["test_data_path"] is None else dataProcessor.load_data(params["test_data_path"])
+    print("Train Size:{},Test Size:{}".format(len(train_data), 0 if test_data is None else len(test_data)))
+
+    rnn = GRU2(raw_input_size=params["alphabet_size"], innder_input_dim=3, num_class=2,
+               hidden_size=params["hidden_size"], num_layers=2, dataProcessor=dataProcessor)
+
+    print("Begin Training......")
+    train_acc = train_with_optim(rnn, params["lr"], params["epocs"], train_data, test_data, dataProcessor,
+                                           cuda_no=cuda_no,
+                                           input_dim=params["alphabet_size"],
+                                           RNN_TYPE=params["rnn_type"],
+                                           lower_bound_acc=params["min_acc"],
+                                           lr_decay=params["lr_decay"])
+
+    print("training acc:{}".format(train_acc))
+
+    with open(params["model_save"], "wb") as f:
+        pickle.dump(rnn.cpu(), f)
+    return rnn
+
+def special_train():
+    '''
+    Force the RNN making right prediction about empty string
+    :return:
+    '''
+
+    model_folder = "./rnn_models/pretrained/tomita"
+    model_path = os.path.join(model_folder, "test-gru-{}.pkl".format("tomita6"))
+    with open(model_path, "rb") as f:
+        rnn = pickle.load(f)
+    rnn =rnn.cuda()
+    ##############################################################
+    # force the rnn to make right prediction about empty string
+    #############################################################
+    optim = torch.optim.Adam(rnn.parameters(), 0.001)
+    dataProcessor = TomitaDataProcessor()
+    cuda_no = 0
+    rnn.train()
+    while rnn.classify_word("") is False:
+        sequence = ""
+        label = True
+        tensor_sequence = dataProcessor.sequence2tensor(sequence)  # Lx1xn_letters
+        ground_truth = torch.LongTensor([label])
+        if cuda_no != -1:
+            tensor_sequence, ground_truth = tensor_sequence.cuda(cuda_no), ground_truth.cuda(cuda_no)
+        optim.zero_grad()
+        output, hx = forware_pass(rnn, tensor_sequence, MTYPE_GRU)
+        pr_dstr = rnn.output_pr_dstr(hx[-1])
+        loss = F.nll_loss(pr_dstr, ground_truth)
+        loss.backward()
+        optim.step()  # update parameters
+
+    with open(model_path,"wb") as f:
+        pickle.dump(rnn.cpu(),f)
+
+    print(rnn.classify_word("", -1))
+
+def train_imdb_for_exact_learning():
     params = {}
-    # ###############
-    # # model setting
-    # ###############
-    # params["input_size"] = 300
-    # params["output_size"] = 2
-    # params["hidden_size"] = 10
-    # params["num_layers"] = 3
-    # params["lr"] = 0.001
-    # params["epocs"] = 5pfa_ijcai
-    #
-    # ####################
-    # # artifacts setting
-    # ####################
-    # params["dataProcessor"] = dataProcessor
-    # params["model_save_root"] = '/home/dgl/project/pfa-data-generator/models/pretrained/exp_ijcai19/5000'
-    # params["data_root"] = "/home/dgl/project/pfa-data-generator/data/exp_ijcai19/5000"
-    # params["data_groups"] = {1: "pfa_expe1", 2: "pfa_expe2", 3: "pfa_expe3", 4: "pfa_expe4", 5: "pfa_expe5"}
-    #
-    # #################
-    # # training env settings
-    # #################
+    params["input_size"] = 300
+    params["output_size"] = 2
+    params["hidden_size"] = 10
+    params["num_layers"] = 3
+    params["lr"] = 0.001
+    cuda_no = 0
+    params["rnn_type"] = MTYPE_GRU
+    params["min_acc"] = 0.9999
+    params["epocs"] = 1000
+    params["model_save"] = "./rnn_models/pretrained/imdb_dfa/gru.pkl"
+
+    word2vec_model_path = "/home/dgl/project/pfa-data-generator/models/pretrained/GoogleNews-vectors-negative300.bin"
+    stop_words_list_path = "/home/dgl/project/pfa-data-generator/data/stopwords.txt"
+    train_data_path = "/home/dgl/project/pfa_extraction/data/imdb_for_dfa"
+    word2vec_model = gensim.models.KeyedVectors.load_word2vec_format(word2vec_model_path, binary=True)
+    dataProcessor = IMDB_Data_Processor_DFA(word2vec_model, stop_words_list_path)
+    rnn = GRU3(params["input_size"] , params["hidden_size"], params["num_layers"], params["output_size"])
+    train_data = dataProcessor.load_data(train_data_path)
+    train_data.append(("$", 1)) # add the "empty string"
+    train_acc = train_with_optim(rnn, params["lr"], params["epocs"], train_data, None, dataProcessor,
+                                           cuda_no=cuda_no,
+                                           input_dim=params["input_size"],
+                                           RNN_TYPE=params["rnn_type"],
+                                           lower_bound_acc=params["min_acc"])
+
+    print("training acc:{}".format(train_acc))
+
+    with open(params["model_save"], "wb") as f:
+        pickle.dump(rnn.cpu(), f)
+
+
+
+
+
+
+if __name__ == "__main__":
+
+    # train_imdb_for_exact_learning()
+
+    with open("./rnn_models/pretrained/imdb_dfa/gru.pkl","r") as f:
+        rnn=pickle.load(f)
+
+    word2vec_model_path = "/home/dgl/project/pfa-data-generator/models/pretrained/GoogleNews-vectors-negative300.bin"
+    stop_words_list_path = "/home/dgl/project/pfa-data-generator/data/stopwords.txt"
+    folder_path = "/home/dgl/project/pfa_extraction/data/imdb_for_dfa"
+    word2vec_model = gensim.models.KeyedVectors.load_word2vec_format(word2vec_model_path, binary=True)
+    dataProcessor = IMDB_Data_Processor_DFA(word2vec_model, stop_words_list_path)
+    rnn.set_dataProcessor(dataProcessor)
+
+    # rnn.eval()
+    # test_data = dataProcessor.load_data(folder_path=folder_path)
+    # dscb,acc=tets_accuracy_concise(rnn, test_data,0)
+    # print(dscb)
+
+    clean_data = dataProcessor.load_clean_data(folder_path=folder_path)
+    dscb,acc=tets_accuracy_concise_with_clean_data(GRU3WrappperDFA(rnn), clean_data, 0)
+    print(dscb)
+    reload_clean_data = dataProcessor.load_clean_data(folder_path=folder_path)
+    dscb, acc = tets_accuracy_concise_with_clean_data(GRU3WrappperDFA(rnn), clean_data, 0)
+    print(dscb)
+
+    # input_dim = 300
+    # num_class = 2
     # cuda_no = 0
+    # RNN_TYPE = MTYPE_GRU
+    # train_descr, train_acc = test_accuracy(rnn, test_data, dataProcessor, input_dim, num_class, cuda_no,
+    #                                        RNN_TYPE=RNN_TYPE)
+
+    # params = {}
+    ########################
+    # Trainig Tomita Data
+    ########################
+    # for grammar in [3,6,5,1,2,4,7]:
+    #     print("training Tomita{}".format(grammar))
+    #     params["lr"] = 0.001
+    #     params["epocs"] = 100
+    #     params["rnn_type"] = MTYPE_GRU
+    #     params["min_acc"] = 0.99999
+    #     params["hidden_size"] = 100
+    #     params["train_data_path"] = "./data/tomita/training/tomita" + str(grammar) + ".pkl"
+    #     params["test_data_path"] = "./data/tomita/test/tomita" + str(grammar) + ".pkl"
+    #     params["model_save"] = "./rnn_models/pretrained/tomita/gru-tomita" + str(grammar) + ".pkl"
+    #     params["lr_decay"] = True
+    #     params["alphabet_size"] = 3
+    #     print("Params:{}\n".format(params))
+    #     rnn = train_tomita(params, cuda_no=-1)
+    #     break
+    # rnn = rnn.cpu()
+    #
+    ########################
+    # Trainig BP Data
+    ########################
+    # print("training BP languages....")
+    # params["lr"] = 0.001
+    # params["epocs"] = 100
     # params["rnn_type"] = MTYPE_GRU
-    # params["min_acc"] = 0.86
-    # for data_id in range(1, 6):
-    #     train_imdb(params, data_id, cuda_no)
+    # params["min_acc"] = 0.9999
+    # params["hidden_size"] = 50
+    # params["alphabet_size"] = 29 # empty string, a-z, (, )
+    # params["train_data_path"] = "./data/bp/bp.pkl"
+    # params["test_data_path"] = None
+    # params["model_save"] = "./rnn_models/pretrained/bp/gru-bp.pkl"
+    # params["lr_decay"] = True
+    #
+    # print("Params:{}\n".format(params))
+    # rnn = train_bp(params, cuda_no=0)
 
-    for grammar in [6]:
-        print("training Tomita{}".format(grammar))
-        params["lr"] = 0.001
-        params["epocs"] = 1000
-        params["rnn_type"] = MTYPE_GRU
-        params["min_acc"] = 0.9999
-        params["hidden_size"]=100
-        params["datapath"] = "./data/tomita/tomita"+str(grammar)+".pkl"
-        params["split_data_path"] = "./data/tomita/split_tomita"+str(grammar)+".pkl_icml"
-        params["model_save"] = "./models/pretrained/tomita/gru-tomita"+str(grammar)+".pkl_icml"
-        params["lr_decay"]=True
-        rnn = train_tomita(params, cuda_no=0)
-    rnn = rnn.cpu()
-    # print(rnn.classify_word("11000"))
-    # print(rnn.classify_word("1100010"))
+    # special_train()
 
-    # with open("./models/pretrained/tomita/gru-tomita"+str(1)+".pkl_icml","rb") as f:
-    #     rnn=pickle.load(f).cpu()
-    # # print(rnn.classify_word("11000"))
-    # # print(rnn.classify_word("1100"))
-    # str = "1100"
-    # dataProcessor=TomitaDataProcessor()
-    # input_tensor = dataProcessor.sequence2tensor(str)
-    # output, h_n = rnn(input_tensor)
-    # print(output)
-    # print("ouput shape {}".format(output.shape))
-    # print(rnn.hx2list(h_n))
-    # print("=========")
-    # h_0 = rnn.get_first_RState()
-    # for char in str:
-    #     h_0=rnn.get_next_RState(h_0, char)
-    #     print(h_0)
+

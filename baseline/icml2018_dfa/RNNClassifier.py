@@ -76,8 +76,8 @@ class RNNClassifier:
             s = self._next_state(s,c)
         return self._state_accept_probability(s)
 
-    def classify_word(self,word):
-        return self._probability_word_in_language(word).value()>0.5
+    def classify_word(self,*args):
+        return self._probability_word_in_language(args[0]).value() > 0.5
 
     def loss_on_word(self, word, label):
         s = self.rnn.initial_state
@@ -100,6 +100,7 @@ class RNNClassifier:
         plt.scatter(range(len(self.all_losses)),self.all_losses,label="classification loss since initiation")
         plt.legend()
         plt.show()
+
 
     def train_group(self,word_dict,iterations,trainer_class=dy.AdamTrainer,learning_rate=None,loss_every=100,
                     batch_size=20,show=True,print_time=True,stop_threshold=0):

@@ -1,3 +1,4 @@
+#coding:utf8
 from copy import deepcopy
 from time import clock
 
@@ -6,7 +7,7 @@ class WhiteboxRNNCounterexampleGenerator:
         self.time_limit = None 
         self.whiteboxrnn = network
         self.partitioning = partitioning
-        self.starting_dict = {cex:network.classify_word(cex) for cex in starting_examples}
+        self.starting_dict = {cex:network.classify_word(cex,-1) for cex in starting_examples}
         return
 
     def set_time_limit(self,time_limit,start_time):
@@ -16,7 +17,9 @@ class WhiteboxRNNCounterexampleGenerator:
     def _get_counterexample_from(self,words):
         words = sorted(words,key=lambda x:len(x)) #prefer shortest possible counterexample
         for w in words:
-            if not self.whiteboxrnn.classify_word(w) == self.proposed_dfa.classify_word(w):
+            rnn_pdt = self.whiteboxrnn.classify_word(w,-1)
+            dfa_pdt = self.proposed_dfa.classify_word(w)
+            if not rnn_pdt == dfa_pdt:
                 return w
         return None
 
@@ -42,11 +45,11 @@ class WhiteboxRNNCounterexampleGenerator:
         split = SplitInfo()
 
         old_info = self.cluster_information[new_cluster] if new_cluster in self.cluster_information else None
-        full_info = old_info + new_info if not old_info == None else new_info
+        full_info = old_info + new_info if not old_info == None else new_info #append the Rstates and paths
 
         if not new_info.accepting == (new_info.dfa_state in self.proposed_dfa.F):
             counterexample = self._counterexample_from_classification_conflict(new_info)
-        elif not new_info.dfa_state == full_info.dfa_state:
+        elif not new_info.dfa_state == full_info.dfa_state: #同一个cluster不能对应两个dfa-states
             counterexample = self._counterexample_from_cluster_conflict(old_info,new_info)
             if counterexample == None:
                 split = SplitInfo(agreeing_RStates=old_info.RStates, 
@@ -106,7 +109,7 @@ class WhiteboxRNNCounterexampleGenerator:
 
     def counterexample(self,dfa): 
         print("guided starting equivalence query for DFA of size " + str(len(dfa.Q)))
-        dfa.draw_nicely(maximum=30)
+        # dfa.draw_nicely(maximum=30)
         counterexample = self._cex_from_starting_dict(dfa)
         if not None == counterexample:
             return counterexample,counterexample_message(counterexample,self.whiteboxrnn)
@@ -114,6 +117,7 @@ class WhiteboxRNNCounterexampleGenerator:
         self.proposed_dfa = dfa
         while True: #main loop: restarts every time the partitioning is refined
             self._initialise_unrolling() # start BFS exploration of network abstraction with current partitioning
+            i=0
             while True: #inner loop: extracts according to the partitioning, comparing to the proposed dfa as it goes
                 if self._out_of_time(): # note: putting this after all the next bits sometimes leaves the time limit unchecked for a very long time...
                     return None, "lstar extraction not successful - ran out of time"
@@ -132,11 +136,13 @@ class WhiteboxRNNCounterexampleGenerator:
                     else:
                         print("split wasn't perfect: gotta start over")
                         break # clustering has changed, have to restart unrolling from the top
+            i+=1
+            print("Loop:{}".format(i))
 
 
 def counterexample_message(counterexample,rnn):
     return ("returning counterexample of length " + str(len(counterexample)) + ":\t\t" + counterexample + 
-        ", this counterexample is " + ("accepted" if rnn.classify_word(counterexample)==True else "rejected") + 
+        ", this counterexample is " + ("accepted" if rnn.classify_word(counterexample,-1)==True else "rejected") +
         " by the given RNN.")
 
 class SplitInfo: #todo: move this to quantisations and just give the whole thing over to the relevant function there, instead of unpacking it to 3 parameters here

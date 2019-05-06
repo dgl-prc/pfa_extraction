@@ -2,8 +2,8 @@ from ObservationTable import ObservationTable
 import DFA
 from time import clock
 
-def run_lstar(teacher,time_limit):
-    table = ObservationTable(teacher.alphabet,teacher)
+def run_lstar(teacher,time_limit,real_sense=False):
+    table = ObservationTable(teacher.alphabet,teacher,real_sense=real_sense)
     start = clock()
     teacher.counterexample_generator.set_time_limit(time_limit,start)
     table.set_time_limit(time_limit,start)

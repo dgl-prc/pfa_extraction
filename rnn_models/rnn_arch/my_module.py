@@ -12,6 +12,30 @@ import torch.nn as nn
 '''
 class MyModule(nn.Module):
 
+    def classify_word(self,word):
+        '''
+        returns a True or False classification for a word over the input alphabet
+        :param word: e.g., "00011001", "I love you"
+        :return:
+        '''
+        pass
+
+    def get_first_RState(self):
+        '''
+        returns a continuous vector representation of the network's initial state (an RState, as a list of floats)
+        :return:
+        '''
+        pass
+
+    def get_next_RState(self,state,char):
+        '''
+        returns a continuous vector representation of the network's initial state (an RState, as a list of floats)
+        :param state:
+        :param char:
+        :return:
+        '''
+        pass
+
     def output_pr_dstr(self, hidden_states):
         '''
         output the predict probability distribution

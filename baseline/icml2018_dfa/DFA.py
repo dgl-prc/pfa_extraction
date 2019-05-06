@@ -1,3 +1,4 @@
+#coding:utf8
 import graphviz as gv
 from IPython.display import Image
 from IPython.display import display
@@ -17,10 +18,10 @@ separator = "_"
 
 class DFA:
     def __init__(self,obs_table):
-        self.alphabet = obs_table.A #alphabet
-        self.Q = [s for s in obs_table.S if s==obs_table.minimum_matching_row(s)] #avoid duplicate states
-        self.q0 = obs_table.minimum_matching_row("")
-        self.F = [s for s in self.Q if obs_table.T[s]== 1]
+        self.alphabet = obs_table.A #alphabet 相当于action集合
+        self.Q = [s for s in obs_table.S if s==obs_table.minimum_matching_row(s)] #avoid duplicate states. All states
+        self.q0 = obs_table.minimum_matching_row("") # initial state
+        self.F = [s for s in self.Q if obs_table.T[s]== 1] # accept states
         self._make_transition_function(obs_table)
 
     def _make_transition_function(self,obs_table):
@@ -132,10 +133,6 @@ class DFA:
 
         edges_dict = group_edges()
         g = add_edges(g,[(e,{'label':edges_dict[e]}) for e in edges_dict])
-        # print('\n'.join([str(((str(state),str(self.delta[state][a])),{'label':a})) for a in self.alphabet for state in
-        #                  self.Q]))
-        # g = add_edges(g,[((label_to_numberlabel(state),label_to_numberlabel(self.delta[state][a])),{'label':a})
-        #                  for a in self.alphabet for state in self.Q])
         display(Image(filename=g.render(filename='img/automaton')))
 
     def minimal_diverging_suffix(self,state1,state2): #gets series of letters showing the two states are different,

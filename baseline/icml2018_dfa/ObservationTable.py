@@ -1,27 +1,32 @@
 #coding:utf8
 from time import clock
-
+from rnn_models.rnn_arch.gated_rnn import MyString
 class TableTimedOut(Exception):
     pass
 
 
 class ObservationTable:
-    def __init__(self,alphabet,interface,max_table_size=None):
-        self.S = {""} #starts. invariant: prefix closed
-        self.E = {""} #ends. invariant: suffix closed
+    def __init__(self,alphabet,interface,max_table_size=None,real_sense=False):
+        if real_sense:
+            self.S = {MyString(["$"])} #starts. invariant: prefix closed
+            self.E = {MyString([""])}  #ends. invariant: suffix closed
+        else:
+            self.S = {""} #starts. invariant: prefix closed
+            self.E = {""} #ends. invariant: suffix closed
         self.T = interface.recorded_words #{} #finite function T: (S cup (S dot A)) dot E -> {True,False}, might also have more info if
         # interface remembers more, but this is not harmful so long as it contains what it needs
         self.A = alphabet #alphabet
         self.interface = interface # in this implementation, it is the teacher.
         self._fill_T()
-        self._initiate_row_equivalence_cache()
+        self._initiate_row_equivalence_cache() #self.equal_cache 保存的是不相等的行 (row1,row2)
         self.max_table_size = max_table_size
         self.time_limit = None
+        self.real_sense = real_sense
 
     def set_time_limit(self,time_limit,start):
         self.time_limit = time_limit
         self.start = start 
-
+    # self._Trange 给observation table 添加新的元素；self.interface.update_words 记录新元素的成员关系
     def _fill_T(self,new_e_list=None,new_s=None): #modifies, and involved in every kind of modification. modification: store more words
         self.interface.update_words(self._Trange(new_e_list,new_s))
 
@@ -35,10 +40,10 @@ class ObservationTable:
 
     def _initiate_row_equivalence_cache(self):
         self.equal_cache = set() #subject to change
-        for s1 in self.S:
+        for s1 in self.S:#判断S中是否存在相等的两行，目的是精简？
             for s2 in self.S:
                 for a in list(self.A)+[""]:
-                    if self._rows_are_same(s1+a,s2): # 如果这两行不相等，则将其加入到缓存里面
+                    if self._rows_are_same(s1+a,s2): # 如果这两行相等，则将其加入到缓存里面
                         self.equal_cache.add((s1+a,s2))
 
     def _update_row_equivalence_cache(self,new_e=None,new_s=None): #just fixes cache. in case of new_e - only makes it smaller
@@ -76,7 +81,7 @@ class ObservationTable:
     def find_and_handle_inconsistency(self): #modifies - and whenever it does, calls _fill_T
         #returns whether table was inconsistent
         maybe_inconsistent = [(s1,s2,a) for s1,s2 in self.equal_cache if s1 in self.S for a in self.A
-                              if not (s1+a,s2+a) in self.equal_cache]
+                              if not (s1+a,s2+a) in self.equal_cache] # NOTE, 一开始S只有空字符串。
         troublemakers = [a+e for s1,s2,a in maybe_inconsistent for e in
                          [next((e for e in self.E if not self.T[s1+a+e]==self.T[s2+a+e]),None)] if not e==None]
         if len(troublemakers) == 0:
@@ -103,11 +108,11 @@ class ObservationTable:
             print("bad counterexample - already saved and classified in table!")
             return
 
+        # all the prefix of ce
         new_states = [ce[0:i+1] for i in range(len(ce)) if not ce[0:i+1] in self.S]
 
         self.T[ce] = label
         self.S.update(new_states)
-
         self._fill_T() #has to be after adding the new states
         for s in new_states: #has to be after filling T
             self._update_row_equivalence_cache(new_s=s)

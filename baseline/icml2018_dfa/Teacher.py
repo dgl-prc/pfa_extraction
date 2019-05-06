@@ -18,10 +18,10 @@ class Teacher:
     def update_words(self,words):
         seen = set(self.recorded_words.keys())
         words = set(words) - seen #need this to avoid answering same thing twice, which may happen a lot now with optimistic querying...
-        self.recorded_words.update({w:self.network.classify_word(w) for w in words})
+        self.recorded_words.update({w:self.network.classify_word(w,-1) for w in words})
 
     def classify_word(self, w):
-        return self.network.classify_word(w)
+        return self.network.classify_word(w,-1)
 
     def equivalence_query(self, dfa):
         self.dfas.append(dfa)
