@@ -71,8 +71,11 @@ class GRU3(MyModule):
     def set_dataProcessor(self,dataProcessor):
         self.dataProcessor = dataProcessor
 
-    def forward(self, input):
-        output, h_n = self.i2h(input)
+    def forward(self, input, hx=None):
+        if hx is None:
+            output, h_n = self.i2h(input)
+        else:
+            output, h_n = self.i2h(input, hx)
         return output, h_n
 
     def get_predict_trace(self, input_sequences):
@@ -85,18 +88,15 @@ class GRU3(MyModule):
         else:
             raise Exception("Batch is not supported at the moment")
 
-    def classify_word(self, sequence, cuda_num=0):
+    def classify_word(self, sequence, cuda_num=0,need_split=False):
         '''
         :param word:
         :return:
         '''
-        # if word == "":
-        #     return True
-        tensor_sequence = self.dataProcessor.sequence2tensor(sequence, self.raw_input_size)
+        tensor_sequence = self.dataProcessor.sequence2tensor(sequence, self.raw_input_size,need_split=need_split)
         if cuda_num >= 0:
             tensor_sequence = tensor_sequence.cuda(cuda_num)
         output, hx = self.forward(tensor_sequence)
-
         return self._classify_state(hx)
 
     def _classify_state(self, hx):
@@ -174,6 +174,11 @@ class GRU3WrappperDFA(object):
 
         return self.rnn._classify_state(hx)
 
+    def get_first_RState(self):
+        return self.rnn.get_first_RState()
+
+    def get_next_RState(self,h_t,char):
+        return self.rnn.get_next_RState(h_t,char)
 
 
 

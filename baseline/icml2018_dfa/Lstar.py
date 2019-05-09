@@ -10,7 +10,6 @@ def run_lstar(teacher,time_limit,real_sense=False):
 
     while True:
         # find an closed(? unclosed) table
-
         #DGL: get a stable OT
         while True:
             while table.find_and_handle_inconsistency():
@@ -20,14 +19,14 @@ def run_lstar(teacher,time_limit,real_sense=False):
             else:
                 break
         #DGL: after a stable OT got, then we build a DFA over the OT.
-        dfa = DFA.DFA(obs_table=table)
+        dfa = DFA.DFA(obs_table=table,real_sense=real_sense)
         print("obs table refinement took " + str(int(1000*(clock()-start))/1000.0) )
 
         #DGL: we use the equivalence query to revise the model.
-        counterexample = teacher.equivalence_query(dfa)
+        counterexample = teacher.equivalence_query(dfa,real_sense)
         if counterexample == None:
             break
         start = clock()
         # DGL: produce a new state and update the S.
-        table.add_counterexample(counterexample,teacher.classify_word(counterexample))
+        table.add_counterexample(counterexample,teacher.classify_word(counterexample),real_sense)
     return dfa

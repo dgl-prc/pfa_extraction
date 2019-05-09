@@ -54,7 +54,7 @@ class RNNPathWrapper:
         return self.rnn.classify_word(word, cuda_num)
 
 
-def test_accuracy(fa_model, dataset):
+def test_accuracy(fa_model, dataset,real_sense):
     '''
     :param model:
     :param dataset:
@@ -63,7 +63,7 @@ def test_accuracy(fa_model, dataset):
     correct = 0
     for key in dataset.keys():
         label = dataset[key]
-        pdt = fa_model.classify_word(key)
+        pdt = fa_model.classify_word(key,real_sense)
         if pdt == label:
             correct += 1
     return correct / len(dataset)
@@ -84,10 +84,10 @@ def test_accuracy_rnn(fa_model, dataset):
     return correct / len(dataset)
 
 
-def test_fidelity(fa_model, rnn, dataset):
+def test_fidelity(fa_model, rnn, dataset,real_sense):
     count = 0
     for key in dataset.keys():
-        fa_pdt = fa_model.classify_word(key)
+        fa_pdt = fa_model.classify_word(key,real_sense)
         rnn_pdt = rnn.classify_word(key, -1)
         if fa_pdt == rnn_pdt:
             count += 1
@@ -179,36 +179,44 @@ def extract_on_bp():
 
 
 def extract_on_imdb():
-    model_path = "../../rnn_models/pretrained/imdb_dfa/gru.pkl"
-    data_folder = "../../data/imdb_for_dfa/"
+    # model_path = "../../rnn_models/pretrained/imdb_dfa/gru.pkl"
+    # data_folder = "../../data/imdb_for_dfa/"
+
+    # model_path = "../../rnn_models/pretrained/imdb_dfa/gru2.pkl"
+    # data_folder = "../../data/imdb_for_dfa/dataset2"
+
+    model_path = "../../rnn_models/pretrained/imdb_dfa/gru3.pkl"
+    data_folder = "../../data/imdb_for_dfa/dataset3"
+
+
     stop_words_list_path = "../../data/imdb_for_dfa/stopwords.txt"
     print("Testing {IMDB dataset}....\n")
-
     #############
     # load RNN
     #############
     word2vec_model_path = "/home/dgl/project/pfa-data-generator/models/pretrained/GoogleNews-vectors-negative300.bin"
     word2vec_model = gensim.models.KeyedVectors.load_word2vec_format(word2vec_model_path, binary=True)
     dataProcessor = IMDB_Data_Processor_DFA(word2vec_model, stop_words_list_path)
-    alphabet = dataProcessor.make_alphabet(data_folder=data_folder)
-    with open(model_path, "rb") as f:
-        rnn = pickle.load(f)
-    rnn.set_alphabet(alphabet)
-    print("size of alphabet:{}".format(len(alphabet)))
-    rnn.set_dataProcessor(dataProcessor)
 
-    rnnWrapper = GRU3WrappperDFA(rnn)
-    rnnWrapper.eval()
-
-    ####################
-    # load train_data
-    ###################
-    train_set=dataProcessor.load_clean_data(data_folder)
-    starting_examples = get_start_samples(train_set, rnnWrapper)
-    dfa = extract(rnnWrapper, time_limit=None, initial_split_depth=10, starting_examples=starting_examples,real_sense=True)
-    acc = test_accuracy(dfa, train_set)
-    fdlt = test_fidelity(dfa, rnnWrapper, train_set)
-    print("DFA,Accuracy:{},Fidelity:{}".format(acc, fdlt))
+    time_limit = 3600
+    for trace_size in range(5,105,5):
+        ####################
+        # load train_data
+        ###################
+        train_set = dataProcessor.load_clean_data(data_folder,trace_size)
+        alphabet = dataProcessor.make_alphabet(train_set)
+        with open(model_path, "rb") as f:
+            rnn = pickle.load(f)
+        rnn.set_alphabet(alphabet)
+        print("Trace Size:{},size of alphabet:{}".format(trace_size, len(alphabet)))
+        rnn.set_dataProcessor(dataProcessor)
+        # rnnWrapper = GRU3WrappperDFA(rnn)
+        rnn.eval()
+        starting_examples = get_start_samples(train_set, rnn)
+        dfa = extract(rnn, time_limit=time_limit, initial_split_depth=10, starting_examples=starting_examples,real_sense=True)
+        acc = test_accuracy(dfa, train_set,real_sense=True)
+        fdlt = test_fidelity(dfa, rnn, train_set,real_sense=True)
+        print("DFA,Accuracy:{},Fidelity:{}".format(acc, fdlt))
 
 
 
@@ -221,6 +229,46 @@ def debug_Mylist(train_set, rnnWrapper):
         if pdt==label:
             cnt+=1
     print cnt/len(train_set)
+
+def debug_aplhabet():
+    stop_words_list_path = "../../data/imdb_for_dfa/stopwords.txt"
+    data_folder = "../../data/imdb_for_dfa/"
+    word2vec_model_path = "/home/dgl/project/pfa-data-generator/models/pretrained/GoogleNews-vectors-negative300.bin"
+    word2vec_model = gensim.models.KeyedVectors.load_word2vec_format(word2vec_model_path, binary=True)
+    dataProcessor = IMDB_Data_Processor_DFA(word2vec_model, stop_words_list_path)
+    alphabet = dataProcessor.make_alphabet(data_folder=data_folder)
+    print "SQUAREPANTS" in alphabet
+
+def debug_single_step():
+    model_path = "../../rnn_models/pretrained/imdb_dfa/gru.pkl"
+    stop_words_list_path = "../../data/imdb_for_dfa/stopwords.txt"
+    data_folder = "../../data/imdb_for_dfa/"
+    word2vec_model_path = "/home/dgl/project/pfa-data-generator/models/pretrained/GoogleNews-vectors-negative300.bin"
+    word2vec_model = gensim.models.KeyedVectors.load_word2vec_format(word2vec_model_path, binary=True)
+    dataProcessor = IMDB_Data_Processor_DFA(word2vec_model, stop_words_list_path)
+
+
+    alphabet = dataProcessor.make_alphabet(data_folder=data_folder)
+
+    with open(model_path, "rb") as f:
+        rnn = pickle.load(f)
+    rnn.set_alphabet(alphabet)
+    print("size of alphabet:{}".format(len(alphabet)))
+    rnn.set_dataProcessor(dataProcessor)
+    # rnnWrapper = GRU3WrappperDFA(rnn)
+    rnn.eval()
+
+    all_sequence=MyString(["$","Heights"])
+    word1 = MyString(["$"])
+    word2 = MyString(["Heights"])
+
+    print("Predict whole sequence:{}".format(rnn.classify_word(all_sequence, cuda_num=0,need_split=False)))
+
+    rstate,pos1 = rnn.get_first_RState()
+    next_state,pos2 = rnn.get_next_RState(rstate,"Heights")
+    print(pos2)
+
+
 
 
 def check_accuracy():
@@ -252,6 +300,8 @@ if __name__ == "__main__":
     # extract_on_tomita()
     # check_accuracy()
     extract_on_imdb()
+    # debug_single_step()
+    # debug_aplhabet()
 
     # extract_tomita_with_build_in_rnn()
 

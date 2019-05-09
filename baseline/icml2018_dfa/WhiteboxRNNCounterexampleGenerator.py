@@ -1,7 +1,7 @@
 #coding:utf8
 from copy import deepcopy
 from time import clock
-
+from data_factory.imdb_sentiment.imdb_data_process import MyString
 class WhiteboxRNNCounterexampleGenerator:
     def __init__(self,network,partitioning,starting_examples):
         self.time_limit = None 
@@ -14,33 +14,43 @@ class WhiteboxRNNCounterexampleGenerator:
         self.time_limit = time_limit
         self.start_time = start_time
 
-    def _get_counterexample_from(self,words):
+    def _get_counterexample_from(self,words,real_sense=False):
         words = sorted(words,key=lambda x:len(x)) #prefer shortest possible counterexample
         for w in words:
             rnn_pdt = self.whiteboxrnn.classify_word(w,-1)
-            dfa_pdt = self.proposed_dfa.classify_word(w)
+            dfa_pdt = self.proposed_dfa.classify_word(w,real_sense)
             if not rnn_pdt == dfa_pdt:
                 return w
         return None
 
-    def _counterexample_from_classification_conflict(self,state_info):
-        res = self._get_counterexample_from(state_info.paths)
+    def _counterexample_from_classification_conflict(self,state_info,real_sense=False):
+        res = self._get_counterexample_from(state_info.paths,real_sense)
         if None == res:
             print("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
             print("classification conflict didn't cause counterexample:")
             print("check your partitioning is consistent and transition function ")
-            print("(from one continuous network state (R-State) to another) is correct ") 
+            print("(from one continuous network state (R-State) to another) is correct ")
+            print("Check the state paths!!!!!!!!!!!!")
+            for word in state_info.paths:
+                print(word)
             raise NoCounterexampleFromClassificationConflict()
         return res
 
-    def _counterexample_from_cluster_conflict(self,old_info,new_info):
+    def _counterexample_from_cluster_conflict(self,old_info,new_info,real_sense=False):
         q1 =old_info.dfa_state
         q2 = new_info.dfa_state
         prefixes = old_info.paths  + new_info.paths
-        suffix = self.proposed_dfa.minimal_diverging_suffix(q1,q2)
-        return self._get_counterexample_from([p+suffix for p in prefixes])
+        suffix = self.proposed_dfa.minimal_diverging_suffix(q1,q2,real_sense)
+        cex_candts = []
+        for p in prefixes:
+            if suffix == "$":
+                cex_candts.append(p)
+            else:
+                assert not suffix[0] == "$"
+                cex_candts.append(p + suffix)
+        return self._get_counterexample_from(cex_candts,real_sense)
 
-    def _process_new_state_except_children(self,new_cluster,new_info):
+    def _process_new_state_except_children(self,new_cluster,new_info,real_sense=False):
         counterexample = None
         split = SplitInfo()
 
@@ -48,9 +58,9 @@ class WhiteboxRNNCounterexampleGenerator:
         full_info = old_info + new_info if not old_info == None else new_info #append the Rstates and paths
 
         if not new_info.accepting == (new_info.dfa_state in self.proposed_dfa.F):
-            counterexample = self._counterexample_from_classification_conflict(new_info)
+            counterexample = self._counterexample_from_classification_conflict(new_info,real_sense)
         elif not new_info.dfa_state == full_info.dfa_state: #同一个cluster不能对应两个dfa-states
-            counterexample = self._counterexample_from_cluster_conflict(old_info,new_info)
+            counterexample = self._counterexample_from_cluster_conflict(old_info,new_info,real_sense)
             if counterexample == None:
                 split = SplitInfo(agreeing_RStates=old_info.RStates, 
                                   conflicted_RState=new_info.RStates[0]) # the one seen now, in new info
@@ -74,23 +84,27 @@ class WhiteboxRNNCounterexampleGenerator:
                 next_dfa_state = self.proposed_dfa.delta[state_info.dfa_state][char]
                 self.new_RStates.append(UnrollingInfo(next_dfa_state,path,next_RState,pos))
 
-    def _process_top_pair(self):
+    def _process_top_pair(self,real_sense=False):
         new_info = self.new_RStates.pop(0)
         self.new_RStates_backup = new_info #might want to unpop if we refine the partitioning and want to restart from here
         new_cluster = self.partitioning.get_partition(new_info.RStates[0])
-        counterexample, split = self._process_new_state_except_children(new_cluster, new_info)
+        counterexample, split = self._process_new_state_except_children(new_cluster, new_info,real_sense)
         if (counterexample == None) and (not split.has_info): #i.e. no conflicts
             self._add_children_states(new_cluster)
         return counterexample, split
 
-    def _initialise_unrolling(self):
+    def _initialise_unrolling(self,real_sense=False):
         self.cluster_information = {} 
         initial_RState, pos = self.whiteboxrnn.get_first_RState()
-        self.new_RStates = [UnrollingInfo(self.proposed_dfa.q0,"",initial_RState,pos)]
+        if real_sense:
+            self.new_RStates = [UnrollingInfo(self.proposed_dfa.q0,MyString(["$"]),initial_RState,pos)]
+        else:
+            self.new_RStates = [UnrollingInfo(self.proposed_dfa.q0,"",initial_RState,pos)]
 
-    def _cex_from_starting_dict(self,dfa):
+
+    def _cex_from_starting_dict(self,dfa,real_sense=False):
         for cex in self.starting_dict:
-            if not dfa.classify_word(cex) == self.starting_dict[cex]:
+            if not dfa.classify_word(cex,real_sense) == self.starting_dict[cex]:
                 print("storing provided counterexample of length " + str(len(cex)))
                 return cex
         return None
@@ -107,23 +121,23 @@ class WhiteboxRNNCounterexampleGenerator:
                 and new_states_given_to_agreeing == [old_cluster] \
                 and not self.partitioning.get_partition(split.conflicted_RState) == old_cluster
 
-    def counterexample(self,dfa): 
+    def counterexample(self,dfa,real_sense=False):
         print("guided starting equivalence query for DFA of size " + str(len(dfa.Q)))
         # dfa.draw_nicely(maximum=30)
-        counterexample = self._cex_from_starting_dict(dfa)
+        counterexample = self._cex_from_starting_dict(dfa,real_sense)
         if not None == counterexample:
             return counterexample,counterexample_message(counterexample,self.whiteboxrnn)
 
         self.proposed_dfa = dfa
         while True: #main loop: restarts every time the partitioning is refined
-            self._initialise_unrolling() # start BFS exploration of network abstraction with current partitioning
+            self._initialise_unrolling(real_sense) # start BFS exploration of network abstraction with current partitioning
             i=0
             while True: #inner loop: extracts according to the partitioning, comparing to the proposed dfa as it goes
                 if self._out_of_time(): # note: putting this after all the next bits sometimes leaves the time limit unchecked for a very long time...
                     return None, "lstar extraction not successful - ran out of time"
                 if len(self.new_RStates) == 0: # seen everything there is to see here
                     return None, "lstar successful: unrolling seems equivalent to proposed automaton"
-                counterexample, split = self._process_top_pair() # always returns a cex, or a split, or neither - but never both
+                counterexample, split = self._process_top_pair(real_sense) # always returns a cex, or a split, or neither - but never both
                 if not None == counterexample:
                     return counterexample,counterexample_message(counterexample,self.whiteboxrnn)
                 elif split.has_info:
@@ -141,7 +155,7 @@ class WhiteboxRNNCounterexampleGenerator:
 
 
 def counterexample_message(counterexample,rnn):
-    return ("returning counterexample of length " + str(len(counterexample)) + ":\t\t" + counterexample + 
+    return ("returning counterexample of length " + str(len(counterexample)) + ":\t\t" + str(counterexample) +
         ", this counterexample is " + ("accepted" if rnn.classify_word(counterexample,-1)==True else "rejected") +
         " by the given RNN.")
 

@@ -21,12 +21,12 @@ def copy_files_with_filter(files_list, src_folder, dest_folder, dataprocessor,ma
         dest_file = os.path.join(dest_folder, file_name)
         with open(source_file, "r") as f:
             sequence = f.readlines()
-        word_sequence = map(dataprocessor.sequence_purifier, sequence)[0]
-        if len(word_sequence) <= 100:  # only reserve the number of valid words is less than or equal to 100
-            copyfile(source_file, dest_file)
-            cnt+=1
-        if cnt > max_size:
-            break
+            word_sequence = map(dataprocessor.sequence_purifier, sequence)[0]
+            if len(word_sequence) <= max_length:  # only reserve the number of valid words is less than or equal to 100
+                copyfile(source_file, dest_file)
+                cnt+=1
+            if cnt >= max_size:
+                break
     print("Success:{}".format(cnt))
 
 
@@ -88,14 +88,14 @@ def make_data_for_PFA():
     print('DONE!')
 
 
-def make_data_for_DFA():
+def make_data_for_DFA(dataset_no,total_size,valide_length):
     '''
     For the DFA proposed in ICML 2018.
     Randomly choose 500 samples from the training set and the number of valid words of each  is less than or equal to 100
     :return:
     '''
     random_seed = 20192025
-    save_path = "/home/dgl/project/pfa_extraction/data/imdb_for_dfa"
+    save_path = "/home/dgl/project/pfa_extraction/data/imdb_for_dfa/dataset"+str(dataset_no)+"-len-"+str(valide_length)
     rnd_train_pos_path = os.path.join(save_path, "pos")
     rnd_train_neg_path = os.path.join(save_path, "neg")
 
@@ -107,19 +107,21 @@ def make_data_for_DFA():
     train_pos_files_iist = os.listdir(train_pos_path)
     dataProcessor = IMDB_Data_Processor(None, stop_words_list_path)
 
-    train_size = 500//2
+    train_size = total_size//2
 
     np.random.seed(random_seed)
-    random_train_neg = np.random.choice(train_neg_files_list, 5000, replace=False)
+    random_train_neg = np.random.choice(train_neg_files_list, 10000, replace=False)
     np.random.seed(random_seed)
-    random_train_pos = np.random.choice(train_pos_files_iist, 5000, replace=False)
+    random_train_pos = np.random.choice(train_pos_files_iist, 10000, replace=False)
 
     # (files_list, src_folder, dest_folder, dataProcessor)
-    copy_files_with_filter(random_train_pos, train_pos_path, rnd_train_pos_path, dataProcessor,train_size)
-    copy_files_with_filter(random_train_neg, train_neg_path, rnd_train_neg_path, dataProcessor,train_size)
+    copy_files_with_filter(random_train_pos, train_pos_path, rnd_train_pos_path, dataProcessor,train_size,max_length=valide_length)
+    copy_files_with_filter(random_train_neg, train_neg_path, rnd_train_neg_path, dataProcessor,train_size,max_length=valide_length)
 
-    print("Saved in {}".format(os.path.abspath("/home/dgl/project/pfa_ijcai/data/imdb_for_dfa")))
+    print("Saved in {}".format(save_path))
 
 if __name__ == '__main__':
-    make_data_for_DFA()
-
+    dataset_no = 6
+    total_size = 100
+    valide_length = 12
+    make_data_for_DFA(dataset_no,total_size,valide_length)

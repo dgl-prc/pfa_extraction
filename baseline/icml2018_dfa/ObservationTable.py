@@ -1,9 +1,10 @@
 #coding:utf8
 from time import clock
 from rnn_models.rnn_arch.gated_rnn import MyString
+
+
 class TableTimedOut(Exception):
     pass
-
 
 class ObservationTable:
     def __init__(self,alphabet,interface,max_table_size=None,real_sense=False):
@@ -62,7 +63,25 @@ class ObservationTable:
         # row(s) = f:E->{0,1} where f(e)=T(se)
         # 判断S中两个元素是否不不不不不想等
         # 只要找到一个后缀能够让其相等，则返回false。
-        return next((e for e in self.E if not self.T[s+e]==self.T[t+e]),None) == None
+
+        #################################################################################
+        # rewrite the following statement for the sake of debug
+        # return next((e for e in self.E if not self.T[s+e]==self.T[t+e]),None) == None
+        ##################################################################################
+
+        not_same = []
+        for e in self.E:
+            key1 = s + e
+            key2 = t + e
+            if not self.T[key1] == self.T[key2]:
+                not_same.append(e)
+        if len(not_same) == 0:
+            return True
+        else:
+            return False
+
+
+
 
     def all_live_rows(self):
         return [s for s in self.S if s == self.minimum_matching_row(s)]
@@ -82,7 +101,11 @@ class ObservationTable:
         #returns whether table was inconsistent
         maybe_inconsistent = [(s1,s2,a) for s1,s2 in self.equal_cache if s1 in self.S for a in self.A
                               if not (s1+a,s2+a) in self.equal_cache] # NOTE, 一开始S只有空字符串。
-        troublemakers = [a+e for s1,s2,a in maybe_inconsistent for e in
+        if self.real_sense:
+            troublemakers = [MyString([a])+e for s1,s2,a in maybe_inconsistent for e in
+                         [next((e for e in self.E if not self.T[s1+a+e]==self.T[s2+a+e]),None)] if not e==None]
+        else:
+            troublemakers = [a+e for s1,s2,a in maybe_inconsistent for e in
                          [next((e for e in self.E if not self.T[s1+a+e]==self.T[s2+a+e]),None)] if not e==None]
         if len(troublemakers) == 0:
             return False
@@ -103,13 +126,16 @@ class ObservationTable:
         self._assert_not_timed_out()
         return True
 
-    def add_counterexample(self,ce,label): #modifies - and definitely calls _fill_T
+    def add_counterexample(self,ce,label,real_sense=False): #modifies - and definitely calls _fill_T
         if ce in self.S:
             print("bad counterexample - already saved and classified in table!")
             return
 
         # all the prefix of ce
-        new_states = [ce[0:i+1] for i in range(len(ce)) if not ce[0:i+1] in self.S]
+        if real_sense:
+            new_states = [MyString(ce[0:i + 1]) for i in range(len(ce)) if not MyString(ce[0:i + 1]) in self.S]
+        else:
+            new_states = [ce[0:i + 1] for i in range(len(ce)) if not ce[0:i + 1] in self.S]
 
         self.T[ce] = label
         self.S.update(new_states)

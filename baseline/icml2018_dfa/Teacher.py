@@ -1,7 +1,7 @@
 from Quantisations import SVMDecisionTreeQuantisation
 from WhiteboxRNNCounterexampleGenerator import WhiteboxRNNCounterexampleGenerator
 from time import clock
-
+from data_factory.imdb_sentiment.imdb_data_process import MyString
 class Teacher:
     def __init__(self, network, num_dims_initial_split=10,starting_examples=None):
         if None == starting_examples:
@@ -18,15 +18,16 @@ class Teacher:
     def update_words(self,words):
         seen = set(self.recorded_words.keys())
         words = set(words) - seen #need this to avoid answering same thing twice, which may happen a lot now with optimistic querying...
+        debug= MyString(["$"]) in words
         self.recorded_words.update({w:self.network.classify_word(w,-1) for w in words})
 
     def classify_word(self, w):
         return self.network.classify_word(w,-1)
 
-    def equivalence_query(self, dfa):
+    def equivalence_query(self, dfa,real_sense=False):
         self.dfas.append(dfa)
         start = clock()
-        counterexample,message = self.counterexample_generator.counterexample(dfa)
+        counterexample,message = self.counterexample_generator.counterexample(dfa,real_sense=real_sense)
         counterexample_time = clock() - start
         print(message)
         print("equivalence checking took: " + str(counterexample_time))

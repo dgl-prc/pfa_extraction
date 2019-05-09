@@ -91,8 +91,8 @@ class IMDB_Data_Processor(object):
         sequence_list = []
         file_names = []
 
-        num_pos=int(np.ceil(data_size*0.5))
-        num_neg=int(np.ceil(data_size*0.5))
+        num_pos=data_size//2
+        num_neg=data_size//2
 
         pos_list = os.listdir(os.path.join(folder_path,'pos'))
         neg_list = os.listdir(os.path.join(folder_path,'neg'))
@@ -165,75 +165,111 @@ class MyString(object):
         return " ".join(self.data)
 
     def __add__(self, other):
-        data = self.data + other.data
+        if isinstance(other, str):
+            if other == "":
+                data = self.data
+            else:
+                data = self.data + [other]
+        else:
+            if other.data == [""]:
+                data = self.data
+            else:
+                data = self.data + other.data
+
         return MyString(data)
 
     def __eq__(self, other):
-        return " ".join(self.data) == " ".join(other.data)
+
+        if not None == other:
+            if isinstance(other,str):
+                return " ".join(self.data) == other
+            else:
+                return " ".join(self.data) == " ".join(other.data)
+        else:
+            return False
 
     def __hash__(self):
         return hash(self.__str__())
+
+    def __getitem__(self, index):
+        return self.data[index]
 
 class IMDB_Data_Processor_DFA(IMDB_Data_Processor):
     def __init__(self,word2vec_model, stop_words_path):
         super(IMDB_Data_Processor_DFA, self).__init__(word2vec_model, stop_words_path)
 
-    # overwrite
-    def sequence2tensor(self, sequences, input_tensor_dim,need_split=True):
-        '''
-        Use the dollar as the first input, just like the empty string in regular language
-        :param sequences:
-        :param input_tensor_dim:
-        :return: PackedSequence
-        '''
-        if need_split:
-            sequences = sequences if isinstance(sequences, list) else [sequences]
-            word_sequences = map(self.sequence_purifier,sequences)
-            word_sequence = word_sequences[0]
-        else:
-            word_sequence = sequences
-
-        sequence_tensor = torch.zeros(1, len(word_sequence)+1, input_tensor_dim)  # batch,len_sequence,input_size
-        sequence_tensor[0][0]=torch.tensor(self.word2vec_model["$"])
-        for li, word in enumerate(word_sequence):
+    def make_sequnece_tensor(self,len_seq,sequence,need_add_empty):
+        sequence_tensor = torch.zeros(1, len_seq, 300)
+        if need_add_empty:
+            sequence_tensor[0][0] = torch.tensor(self.word2vec_model["$"])  # add the empty string
+        sequence = [sequence] if isinstance(sequence,str) else sequence
+        for li, word in enumerate(sequence):
             try:
                 vector = self.word2vec_model[word]
             except KeyError as e:
-                # print("{} not in vocabulary".format(word))
                 continue
-            sequence_tensor[0][li+1] = torch.tensor(vector)
+            if need_add_empty:
+                sequence_tensor[0][li + 1] = torch.tensor(vector)
+            else:
+                sequence_tensor[0][li] = torch.tensor(vector)
         return sequence_tensor
 
 
-    def make_alphabet(self,data_folder):
+    # overwrite
+    def sequence2tensor(self, sequence, input_tensor_dim,need_split=False,is_single_step=False):
+        '''
+        Use the dollar as the first input, just like the empty string in regular language
+        :param sequence:
+        :param input_tensor_dim:
+        :param need_split whether or not use the regex to split the sequences,if not, then it means the sequence is well-split
+        :param is_single_step: if True, then the sequence only contains one word and dose not need to add the "empty string"
+        :return: PackedSequence
+        '''
+        if need_split:
+            assert isinstance(sequence,str)
+            assert is_single_step==False
+            sequences = sequence if isinstance(sequence, list) else [sequence]
+            word_sequences = map(self.sequence_purifier,sequences)
+            sequence = word_sequences[0]
+            len_seq = len(sequence) + 1  # add the empty string
+            need_add_empty = True
+        elif is_single_step:
+            assert isinstance(sequence, str) or isinstance(sequence, MyString)
+            sequence = str(sequence) # if sequence, then convert it into string
+            need_add_empty = False
+            len_seq = 1
+        else:
+            assert isinstance(sequence, list) or isinstance(sequence, MyString)
+            first_word = sequence[0]
+            if first_word == "$":
+                len_seq = len(sequence)
+                need_add_empty = False
+            else:
+                len_seq = len(sequence) + 1  # add the empty string
+                need_add_empty = True
+        sequence_tensor = self.make_sequnece_tensor(len_seq, sequence, need_add_empty)
+        return sequence_tensor
+
+    def make_alphabet(self,train_set):
 
         alphabet=set()
-        # alphabet_count={}
-        pos_list = os.listdir(os.path.join(data_folder,'pos'))
-        neg_list = os.listdir(os.path.join(data_folder,'neg'))
-        for file_name in pos_list:
-            with open(os.path.join(data_folder,'pos',file_name), 'r') as f:
-                sequence = f.readlines()
-                assert len(sequence) != 0
-                word_sequence = map(self.sequence_purifier, sequence)[0]
-                alphabet = alphabet|set(word_sequence)
-        for file_name in neg_list:
-            with open(os.path.join(data_folder, 'neg',file_name), 'r') as f:
-                sequence = f.readlines()
-                assert len(sequence) != 0
-                word_sequence = map(self.sequence_purifier, sequence)[0]
-                alphabet = alphabet | set(word_sequence)
+        for words in train_set:
+            for word in words:
+                alphabet.add(word)
+        #####################################################
+        # check if the word of aphabet is in the word2vec
+        #####################################################
 
-        return alphabet
+        return {word for word in alphabet if word in self.word2vec_model}
 
-    def load_clean_data(self, folder_path):
-        train_data = self.load_data(folder_path)
-        self.load_data(folder_path)
+    def load_clean_data(self, folder_path,trace_size):
+        train_data = self.load_data(folder_path,data_size=trace_size)
         # clean_data = [] # dict can not be used since list is unhashable type
         clean_data={}
         for data_pair in train_data:
             sequence, label = data_pair
             word_sequence = map(self.sequence_purifier, [sequence])[0]
+            word_sequence = [word for word in word_sequence if word in self.word2vec_model]
             assert isinstance(word_sequence, list)
             clean_data[MyString(word_sequence)]=label
         clean_data[MyString(["$"])]=1  # add the "empty string"
