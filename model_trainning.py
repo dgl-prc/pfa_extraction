@@ -150,7 +150,7 @@ def test_accuracy(rnn, test_data, dataProcessor, input_dim, num_class, cuda_no, 
             label = sequence[1]
             sequence = sequence[0]  # list
 
-        tensor_sequence = dataProcessor.sequence2tensor(sequence, input_dim)  # Lx1xn_letters
+        tensor_sequence = dataProcessor.sequence2tensor(sequence, input_dim,need_split=True)  # Lx1xn_letters
         if cuda_no != -1:
             tensor_sequence = tensor_sequence.cuda(cuda_no)
         output, hx = forware_pass(rnn, tensor_sequence, RNN_TYPE)
@@ -205,7 +205,7 @@ def train_with_optim(rnn, lr, epocs, train_data, test_data=None, dataProcessor=N
                 label = sequence[1]
                 sequence = sequence[0]  # list
 
-            tensor_sequence = dataProcessor.sequence2tensor(sequence, input_dim)  # Lx1xn_letters
+            tensor_sequence = dataProcessor.sequence2tensor(sequence, input_dim,need_split=True)  # Lx1xn_letters
             ground_truth = torch.LongTensor([label])
             if cuda_no != -1:
                 tensor_sequence, ground_truth = tensor_sequence.cuda(cuda_no), ground_truth.cuda(cuda_no)
@@ -544,7 +544,7 @@ def special_train():
 
     print(rnn.classify_word("", -1))
 
-def train_imdb_for_exact_learning():
+def train_imdb_for_exact_learning(train_data_path,model_save_name):
     params = {}
     params["input_size"] = 300
     params["output_size"] = 2
@@ -555,11 +555,10 @@ def train_imdb_for_exact_learning():
     params["rnn_type"] = MTYPE_GRU
     params["min_acc"] = 0.9999
     params["epocs"] = 1000
-    params["model_save"] = "./rnn_models/pretrained/imdb_dfa/gru.pkl"
+    params["model_save"] = "./rnn_models/pretrained/imdb_dfa/"+model_save_name
 
     word2vec_model_path = "/home/dgl/project/pfa-data-generator/models/pretrained/GoogleNews-vectors-negative300.bin"
     stop_words_list_path = "/home/dgl/project/pfa-data-generator/data/stopwords.txt"
-    train_data_path = "/home/dgl/project/pfa_extraction/data/imdb_for_dfa"
     word2vec_model = gensim.models.KeyedVectors.load_word2vec_format(word2vec_model_path, binary=True)
     dataProcessor = IMDB_Data_Processor_DFA(word2vec_model, stop_words_list_path)
     rnn = GRU3(params["input_size"] , params["hidden_size"], params["num_layers"], params["output_size"])
@@ -581,31 +580,56 @@ def train_imdb_for_exact_learning():
 
 
 
-if __name__ == "__main__":
+def avg_length():
+    #Total:400,average length :111.475,alphabet size:11173
+    # train_data_path = "/home/dgl/project/pfa-data-generator/data/pfa_expe3/test"
+    # Total:99,average length :16.0606060606,alphabet size:936
 
-    # train_imdb_for_exact_learning()
-
-    with open("./rnn_models/pretrained/imdb_dfa/gru.pkl","r") as f:
-        rnn=pickle.load(f)
-
+    train_data_path = "/home/dgl/project/pfa_extraction/data/imdb_for_dfa/dataset3"
     word2vec_model_path = "/home/dgl/project/pfa-data-generator/models/pretrained/GoogleNews-vectors-negative300.bin"
     stop_words_list_path = "/home/dgl/project/pfa-data-generator/data/stopwords.txt"
-    folder_path = "/home/dgl/project/pfa_extraction/data/imdb_for_dfa"
     word2vec_model = gensim.models.KeyedVectors.load_word2vec_format(word2vec_model_path, binary=True)
     dataProcessor = IMDB_Data_Processor_DFA(word2vec_model, stop_words_list_path)
-    rnn.set_dataProcessor(dataProcessor)
+    train_data = dataProcessor.load_clean_data(train_data_path, 5000)
+    alphabet = dataProcessor.make_alphabet(train_data)
+    leg_count = 0
+    for seq in train_data:
+        leg_count+=len(seq)
+    alphabet = dataProcessor.make_alphabet(train_data)
+    print("Total:{},average length :{},alphabet size:{}".format(len(train_data),leg_count/len(train_data),len(alphabet)))
 
-    # rnn.eval()
-    # test_data = dataProcessor.load_data(folder_path=folder_path)
-    # dscb,acc=tets_accuracy_concise(rnn, test_data,0)
+
+if __name__ == "__main__":
+    avg_length()
+
+
+    # dataset1 = "/home/dgl/project/pfa_extraction/data/imdb_for_dfa"
+    # dataset2="/home/dgl/project/pfa_extraction/data/imdb_for_dfa/dataset2"
+    # dataset3="/home/dgl/project/pfa_extraction/data/imdb_for_dfa/dataset3"
+    # model_save_name = "gru3.pkl"
+    # train_imdb_for_exact_learning(dataset3,model_save_name)
+
+    # with open("./rnn_models/pretrained/imdb_dfa/gru.pkl","r") as f:
+    #     rnn=pickle.load(f)
+    #
+    # word2vec_model_path = "/home/dgl/project/pfa-data-generator/models/pretrained/GoogleNews-vectors-negative300.bin"
+    # stop_words_list_path = "/home/dgl/project/pfa-data-generator/data/stopwords.txt"
+    # folder_path = "/home/dgl/project/pfa_extraction/data/imdb_for_dfa"
+    # word2vec_model = gensim.models.KeyedVectors.load_word2vec_format(word2vec_model_path, binary=True)
+    # dataProcessor = IMDB_Data_Processor_DFA(word2vec_model, stop_words_list_path)
+    # rnn.set_dataProcessor(dataProcessor)
+    #
+    # # rnn.eval()
+    # # test_data = dataProcessor.load_data(folder_path=folder_path)
+    # # dscb,acc=tets_accuracy_concise(rnn, test_data,0)
+    # # print(dscb)
+    #
+    # clean_data = dataProcessor.load_clean_data(folder_path=folder_path)
+    # dscb,acc=tets_accuracy_concise_with_clean_data(GRU3WrappperDFA(rnn), clean_data, 0)
     # print(dscb)
-
-    clean_data = dataProcessor.load_clean_data(folder_path=folder_path)
-    dscb,acc=tets_accuracy_concise_with_clean_data(GRU3WrappperDFA(rnn), clean_data, 0)
-    print(dscb)
-    reload_clean_data = dataProcessor.load_clean_data(folder_path=folder_path)
-    dscb, acc = tets_accuracy_concise_with_clean_data(GRU3WrappperDFA(rnn), clean_data, 0)
-    print(dscb)
+    # reload_clean_data = dataProcessor.load_clean_data(folder_path=folder_path)
+    # dscb, acc = tets_accuracy_concise_with_clean_data(GRU3WrappperDFA(rnn), clean_data, 0)
+    # print(dscb)
 
     # input_dim = 300
     # num_class = 2

@@ -173,8 +173,8 @@ def extract_on_bp():
 
     starting_examples = get_start_samples(train_set, rnn)
     dfa = extract(rnn, time_limit=50, initial_split_depth=10, starting_examples=starting_examples)
-    acc = test_accuracy(dfa, train_set)
-    fdlt = test_fidelity(dfa, rnn, train_set)
+    acc = test_accuracy(dfa, train_set,real_sense=False)
+    fdlt = test_fidelity(dfa, rnn, train_set,real_sense=False)
     print("DFA,Accuracy:{},Fidelity:{}".format(acc, fdlt))
 
 
@@ -293,20 +293,63 @@ def check_accuracy():
 
 
 
+def extract_tomita_with_build_in_lstm():
+    alphabet = "01"
+    data_folder = "../../data/tomita/training"
+    grammars = ["tomita7","tomita6","tomita5"]
+    for grammar in grammars:
+        print("Testing {}....\n".format(grammar))
+        data_path = os.path.join(data_folder, "{}.pkl".format(grammar))
+        with open(data_path, "rb") as f:
+            dataset = pickle.load(f)
+        train_set = dataset["data"]
+        rnn = RNNClassifier(alphabet, num_layers=2, hidden_dim=100, RNNClass=LSTMNetwork)
+        mixed_curriculum_train(rnn, train_set, stop_threshold=0.0005)
+        acc = test_accuracy(rnn, train_set, real_sense=False)
+        print("LSTM Acc :{}".format(acc))
+        # with open("./icml-gru-{}.pkl".format(grammar),"wb") as f:
+        #     pickle.dump(rnn,f)
+        starting_examples = get_start_samples(train_set, rnn)
+        dfa = extract(rnn, time_limit=1800, initial_split_depth=10, starting_examples=starting_examples)
+        acc = test_accuracy(dfa, train_set,real_sense=False)
+        fdlt = test_fidelity(dfa, rnn, train_set,real_sense=False)
+        print("DFA,Accuracy:{},Fidelity:{}".format(acc, fdlt))
 
+
+
+def extract_BP_with_build_in_lstm():
+    alphabet = list("()" + string.ascii_lowercase)
+    data_folder = "../../data/bp/"
+    print("Testing {}....\n".format("BP"))
+    data_path = os.path.join(data_folder, "{}.pkl".format("bp"))
+    with open(data_path, "rb") as f:
+        dataset = pickle.load(f)
+    train_set = dataset["data"]
+    rnn = RNNClassifier(alphabet, num_layers=2, hidden_dim=100, RNNClass=LSTMNetwork)
+    mixed_curriculum_train(rnn, train_set, stop_threshold=0.0005)
+    acc = test_accuracy(rnn, train_set, real_sense=False)
+    print("LSTM Acc :{}".format(acc))
+    # with open("./icml-gru-{}.pkl".format(grammar),"wb") as f:
+    #     pickle.dump(rnn,f)
+    starting_examples = get_start_samples(train_set, rnn)
+    dfa = extract(rnn, time_limit=50, initial_split_depth=6, starting_examples=starting_examples)
+    acc = test_accuracy(dfa, train_set, real_sense=False)
+    fdlt = test_fidelity(dfa, rnn, train_set, real_sense=False)
+    print("DFA,Accuracy:{},Fidelity:{}".format(acc, fdlt))
 
 
 if __name__ == "__main__":
     # extract_on_tomita()
     # check_accuracy()
-    extract_on_imdb()
+    # extract_on_imdb()
     # debug_single_step()
     # debug_aplhabet()
 
     # extract_tomita_with_build_in_rnn()
 
     # extract_on_bp()
-
+    # extract_tomita_with_build_in_lstm()
+    extract_BP_with_build_in_lstm()
     # model_folder = "../../rnn_models/pretrained/tomita"
     # data_folder = "../../data/tomita/training"
     #

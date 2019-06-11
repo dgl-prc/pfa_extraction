@@ -46,7 +46,8 @@ class WhiteboxRNNCounterexampleGenerator:
             if suffix == "$":
                 cex_candts.append(p)
             else:
-                assert not suffix[0] == "$"
+                if len(suffix)>0:
+                    assert not suffix[0] == "$"
                 cex_candts.append(p + suffix)
         return self._get_counterexample_from(cex_candts,real_sense)
 

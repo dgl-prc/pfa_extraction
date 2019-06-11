@@ -4,7 +4,8 @@ import os
 import graphviz as gv
 from trans_matrix import TransMatrix
 import copy
-
+from IPython.display import Image
+from IPython.display import display
 class PFA():
     def __init__(self, pm_file_path, label_path,integrate_files_path):
         '''
@@ -113,12 +114,12 @@ class PFA():
             cluster = action[:-1]
             return cluster+"/"+output
 
-        mygraph = gv.Digraph('DTMC',engine=layout)
+        mygraph = gv.Digraph('DTMC',engine=layout,graph_attr={"rankdir":"LR"})
         for start,end,weight in zip(self.graphviz_data[0],self.graphviz_data[1],self.graphviz_data[2]):
-            mygraph.node(str(start),label=str(start)+","+action2NodeLabel(self.state2action(start)))
-            mygraph.node(str(end),label=str(end)+","+action2NodeLabel(self.state2action(end)))
+            mygraph.node(str(start),label=str(start)+","+action2NodeLabel(self.state2action(start)),shape="circle")
+            mygraph.node(str(end),label=str(end)+","+action2NodeLabel(self.state2action(end)),shape="circle")
             mygraph.edge(str(start),str(end),str(round(weight,5)))
-        mygraph.render(save_path,view=view)
+        display(Image(filename=mygraph.render(save_path,view=view)))
         print('DONE!')
 
     def _get_action_state_list(self, next_state_ids):
