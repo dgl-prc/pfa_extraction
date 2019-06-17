@@ -103,5 +103,5 @@ if __name__=="__main__":
     longg = 11
     data,num_pos,num_neg=get_balanced_parantheses_train_set(n, short, longg, lengths=None, max_train_samples_per_length=300,
                                        search_size_per_length=200)
-    with(open("../../data/bp/bp.pkl","wb")) as f:
+    with(open("../../data/bp/gru_bp.pkl","wb")) as f:
          pickle.dump({"data":data,"num_pos":num_pos,"num_neg":num_neg},f)

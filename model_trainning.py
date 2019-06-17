@@ -669,9 +669,9 @@ if __name__ == "__main__":
     # params["min_acc"] = 0.9999
     # params["hidden_size"] = 50
     # params["alphabet_size"] = 29 # empty string, a-z, (, )
-    # params["train_data_path"] = "./data/bp/bp.pkl"
+    # params["train_data_path"] = "./data/bp/gru_bp.pkl"
     # params["test_data_path"] = None
-    # params["model_save"] = "./rnn_models/pretrained/bp/gru-bp.pkl"
+    # params["model_save"] = "./rnn_models/pretrained/bp/gru-gru_bp.pkl"
     # params["lr_decay"] = True
     #
     # print("Params:{}\n".format(params))
