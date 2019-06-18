@@ -169,34 +169,22 @@ class SPAM_Data_Processor():
 def extract_subject(filename):
     ''' Extract the subject and payload from the .eml file.
 
-    	'''
-    if not os.path.exists(filename):  # dest path doesnot exist
+    '''
+    if not os.path.exists(filename):
         print("ERROR: input file does not exist:", filename)
-        os.exit(1)
+        return ''
     fp = open(filename)
     msg = email.message_from_file(fp)
-    payload = ''
-    for part in msg.walk():
-        if part.get_content_type() == 'text/plain':
-            payload = part.get_payload()
-            break
-        if part.get_content_type() == 'text/html':
-            payload = part.get_payload()
-            break
-        if part.get_content_type() == 'multipart/alternative':
-            payload = part.get_payload()
-            break
+    payload = msg.get_payload()
 
-    if payload == '':
-        payload = msg.get_payload()
-
-    if type(payload) == type(list()):
+    if isinstance(payload, list):
         payload = payload[0]  # only use the first part of payload
 
-    if type(payload) != type(''):
+    if not isinstance(payload, str):
         payload = str(payload)
 
     if 'From nobody' in payload:
+        # print filename
         for part in msg.walk():
             if part.get_content_type() == 'text/plain':
                 payload = part.get_payload()
@@ -205,11 +193,15 @@ def extract_subject(filename):
                 payload = part.get_payload()
                 break
 
-    if type(payload) == type(list()):
-        payload = payload[0]
-    if type(payload) != type(''):
+    if isinstance(payload, list):
+        payload = payload[0]  # only use the first part of payload
+
+    if not isinstance(payload, str):
         payload = str(payload)
 
     sub = msg.get('subject')
     sub = str(sub)
     return sub + payload
+
+
+
