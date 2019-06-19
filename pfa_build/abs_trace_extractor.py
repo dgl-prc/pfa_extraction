@@ -1,11 +1,13 @@
-from sklearn.cluster import KMeans
+from sklearn.cluster import KMeans, AgglomerativeClustering
+from tempfile import mkdtemp
+from joblib import Memory
 import numpy as np
 import pickle
 # from data_process.name_classifiction.rnnexamples import DataProcessor
 import string
 import os
-from data_process.imdb_sentiment.imdb_data_process import IMDB_Data_Processor
-from data_process.imdb_sentiment.vocabulary import Vob
+from data_factory.imdb_sentiment.imdb_data_process import IMDB_Data_Processor
+from data_factory.imdb_sentiment.vocabulary import Vob
 from utils.time_util import current_timestamp
 from utils.constant import *
 import pickle
@@ -25,8 +27,8 @@ output: trace_list
 
 class MODE():
     WL = 1  # wrong_labeld_only
-    VOB=2 # build vocabulary,which maintains the frequence for each word as pos and neg
-    NORMAL=3
+    VOB = 2 # build vocabulary,which maintains the frequence for each word as pos and neg
+    NORMAL = 3
 
 
 class AbstractTraceExtractor():
@@ -89,6 +91,80 @@ class AbstractTraceExtractor():
         else:
             return traces_list, outputs_list, predict_ground_list, samples, indices
 
+    def collect_hidden_stack_seq(self, rnn, dataset, dataProcessor, input_dim, use_cuda=False, mode=MODE.NORMAL, with_neuter=True):
+        """
+
+        :param rnn:
+        :param dataset:
+        :param dataProcessor:
+        :param input_dim:
+        :param use_cuda:
+        :param mode:
+        :param with_neuter:
+        :return: traces_list: the hidden state vector concatenated stack traces
+                 outputs_list: the output label at each time step
+                 predict_ground_list: the pairs of predict label and the true label
+                 wl_samples: the pured samples which are wrongly predicted.
+        """
+        traces_list = []
+        outputs_list = []
+        predict_ground_list = []
+        samples = []
+        indices = []
+        index = 0
+        vob = Vob()
+        for sequence, label in dataset:
+
+            # compare
+            tensor_sequence = dataProcessor.sequence2tensor(sequence, input_dim)
+            if use_cuda:
+                tensor_sequence = tensor_sequence.cuda()
+            hn_trace2, label_trace2 = rnn.get_predict_trace(tensor_sequence)
+
+            # get the hidden stacks
+            h0, _ = rnn.get_first_RState()
+            hn_trace = []; label_trace = []
+            h_cur, label_cur = rnn.get_next_RState(h0, '')
+            hn_trace.append(h_cur)
+            label_trace.append(label_cur)
+            for chr in sequence:
+                h_cur, label_cur = rnn.get_next_RState(h_cur, chr)
+                hn_trace.append(h_cur)
+                label_trace.append(label_cur)
+
+            if mode == MODE.VOB:
+                pure_sequence = dataProcessor.sequence_purifier(sequence)
+                vob.add_word(pure_sequence)
+                if with_neuter:
+                    vob.parse_trace(pure_sequence, label_trace)
+                else:
+                    vob.parse_trace_without_neuter(pure_sequence, label_trace)
+            else:
+                if mode == MODE.WL:
+                    if label != label_trace[-1]:
+                        # for spam we use payload_purifier, otherwise using sequence_purifier
+                        pure_sequence = dataProcessor.sequence_purifier(sequence)
+                        samples.append(pure_sequence)
+                        indices.append(index)
+                        traces_list.append(hn_trace)  # tensor to numpy
+                        outputs_list.append(label_trace)
+                        predict_ground_list.append((label_trace[-1], label))
+                if mode == MODE.NORMAL:
+                    pure_sequence = dataProcessor.sequence_purifier(sequence)
+                    samples.append(pure_sequence)
+                    indices.append(index)
+                    traces_list.append(hn_trace)  # tensor to numpy
+                    outputs_list.append(label_trace)
+                    # assert len(pure_sequence) == len(hn_trace) and len(hn_trace) == len(label_trace)
+                    predict_ground_list.append((label_trace[-1], label))
+            index += 1
+            if index % 1000 == 0:
+                print("Handling {}/{}".format(index, len(dataset)))
+
+        if mode == MODE.VOB:
+            return vob
+        else:
+            return traces_list, outputs_list, predict_ground_list, samples, indices
 
     def tracesList2vectorsList(self,traces_list):
         '''
@@ -122,8 +198,7 @@ class AbstractTraceExtractor():
             start += trace_len
         return newTraceList
 
-
-    def state_partition(self,vectorsList, n_clusters, n_init):
+    def kmeans_state_partition(self, vectorsList, n_clusters, n_init=10):
         '''
         :param traces_list: list, each element in which is a couple of vectors
         :param params:
@@ -133,7 +208,18 @@ class AbstractTraceExtractor():
         labels, cluster_centers = kmeans.labels_, kmeans.cluster_centers_
         return labels, cluster_centers, kmeans
 
-    def save_txt(self,trace_folder, trace_list, traces_outputs_list, traces_size_list, predict_ground_list):
+    def hier_state_partition(self, vectorsList, n_clusters, is_refined=False):
+        if not is_refined:
+            cachedir = mkdtemp()
+            memory = Memory(cachedir=cachedir, verbose=0)
+            Aggmeans = AgglomerativeClustering(memory=memory, n_clusters=n_clusters,
+                                               compute_full_tree=True).fit(vectorsList)
+            # labels = Aggmeans.labels_
+            return Aggmeans, cachedir
+        else:
+            pass
+
+    def save_txt(self, trace_folder, trace_list, traces_outputs_list, traces_size_list, predict_ground_list):
         ##########
         # save to txt
         ##########
