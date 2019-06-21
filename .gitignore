@@ -2,6 +2,7 @@
 
 # Exclude system file for idea
 .idea
+*.bin
 
 ### Python template
 # Byte-compiled / optimized / DLL files
