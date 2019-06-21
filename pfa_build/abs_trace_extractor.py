@@ -224,7 +224,9 @@ class AbstractTraceExtractor():
             labels = Aggmeans.labels_
             return labels, Aggmeans, cachedir
         else:
-            pass
+            Aggmeans = AgglomerativeClustering(n_clusters=n_clusters).fit(vectorsList)
+            labels = Aggmeans.labels_
+            return labels, Aggmeans
 
     def save_txt(self, trace_folder, trace_list, traces_outputs_list, traces_size_list, predict_ground_list):
         ##########

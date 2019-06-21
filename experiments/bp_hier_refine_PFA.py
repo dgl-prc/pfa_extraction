@@ -13,18 +13,18 @@ import os
 
 
 if __name__ == '__main__':
-    sys.stdout = Logger('./logs/bp/bp_hier_out.log', sys.stdout)
-    sys.stderr = Logger('./logs/bp/bp_hier_err.log', sys.stderr)
+    sys.stdout = Logger('./logs/bp/bp_hier_refine_out.log', sys.stdout)
+    sys.stderr = Logger('./logs/bp/bp_hier_refine_err.log', sys.stderr)
     variables_path = './variables.txt'
-    root_path = '../storage/bp/traces_data/hier'
-    max_deepth = 20
+    root_path = '../storage/bp/traces_data/hier_refine'
+    max_deepth = 3
     n_init = 10
     train_size = 500
     random_seed = 5566
     k_cluster = 2
     input_dim = 29
     max_length = 60000
-    pfa_save_root = '../storage/bp/pfa_construction/hier'
+    pfa_save_root = '../storage/bp/pfa_construction/hier_refine'
     models_root = '../rnn_models/pretrained/bp'
     data_root = '../data/bp'
     models_type = {MTYPE_GRU:'gru-bp.pkl', MTYPE_LSTM:'lstm-bp.pkl'}
@@ -48,7 +48,7 @@ if __name__ == '__main__':
         print('Doing abstract initial with k={}....'.format(k_cluster))
         time = Time()
         trace_processor = TraceProcessor(extractor, rnn, train_data, data_processor, input_dim)
-        trace_processor.init_hier_parttiion(k_cluster)
+        trace_processor.init_hier_refine_parttiion(k_cluster)
         input_traces_pfa = trace_processor.get_pfa_input_trace(null_added=True)
         persistence.save_train_data(*(trace_processor.get_train_data()))
         deepth = 2
@@ -60,9 +60,9 @@ if __name__ == '__main__':
             elasped = time.time_counter()
             print elasped, deepth
             output_list.append([data, rnn_type, deepth, acc, fdlt, rnn_acc, elasped]); deepth += 1
-            input_traces_pfa = trace_processor.hier_input_update(null_added=True)
-        trace_processor.tmp_clear()
-        persistence.save_output(output_list, '../storage/bp/outcome/bp_hier_' + rnn_type)
+            input_traces_pfa = trace_processor.hier_refine_input_update(pfa, used_traces_path,
+                                                                        persistence.trace_path, null_added=True)
+        persistence.save_output(output_list, '../storage/bp/outcome/bp_hier_refine' + rnn_type)
 
 
 

@@ -23,7 +23,8 @@ class TraceProcessor:
         self.cluster_model = AdditiveKMeans(self.hier_cluster)
 
     def init_hier_refine_parttiion(self, n_cluster):
-        self.labels, self.hier_cluster = self.extractor.state_partition(self.ori_points, n_cluster)
+        self.flatten_traces()
+        self.labels, self.hier_cluster = self.extractor.hier_state_partition(self.ori_points, n_cluster, is_refined=True)
         self.cluster_model = CustomAgglomerativeClustering(self.hier_cluster)
 
     def init_hier_parttiion(self, n_cluster):
@@ -57,8 +58,12 @@ class TraceProcessor:
         input_traces_pfa = self.get_pfa_input_trace(null_added)
         return input_traces_pfa
 
-    def hier_refine_input_update(self):
-        pass
+    def hier_refine_input_update(self, pfa, used_traces_path, trace_path, null_added=False):
+        spurious_cluster = get_spurious_cluster(pfa, used_traces_path, trace_path)
+        clustering_labels = self.cluster_model.cluster_split(self.ori_points, spurious_cluster)
+        self.labels = clustering_labels
+        input_traces_pfa = self.get_pfa_input_trace(null_added)
+        return input_traces_pfa
 
     def kmeans_input_update(self):
         pass
