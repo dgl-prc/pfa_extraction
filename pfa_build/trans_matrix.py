@@ -1,5 +1,7 @@
 import os
 from collections import defaultdict
+
+
 class TransMatrix(object):
     def __init__(self,folder_path,number_state):
         '''

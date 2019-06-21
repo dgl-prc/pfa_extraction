@@ -12,6 +12,7 @@ from utils.time_util import current_timestamp
 from utils.constant import *
 import pickle
 from pfa_build.pfa import PFA
+import torch
 '''
 using k-means to clusteing
 '''
@@ -33,7 +34,8 @@ class MODE():
 
 class AbstractTraceExtractor():
 
-    def collect_hidden_state_seq(self,rnn, dataset, dataProcessor, input_dim, use_cuda=True, mode=MODE.NORMAL,with_neuter=True):
+    def collect_hidden_state_seq(self, rnn, dataset, dataProcessor, input_dim, use_cuda=False, mode=MODE.NORMAL,
+                                 with_neuter=True):
         '''
         :param rnn:
         :param dataset:
@@ -53,8 +55,12 @@ class AbstractTraceExtractor():
         indices = []
         index = 0
         vob = Vob()
+        if not torch.cuda.is_available():
+            use_cuda = False
         for sequence, label in dataset:
             tensor_sequence = dataProcessor.sequence2tensor(sequence, input_dim)
+            # filter the sequence which is too long that is more than 1000 words
+            if len(tensor_sequence[0]) > 1000: continue
             if use_cuda:
                 tensor_sequence = tensor_sequence.cuda()
             hn_trace, label_trace = rnn.get_predict_trace(tensor_sequence)
@@ -62,12 +68,13 @@ class AbstractTraceExtractor():
                 pure_sequence = dataProcessor.sequence_purifier(sequence)
                 vob.add_word(pure_sequence)
                 if with_neuter:
-                    vob.parse_trace(pure_sequence,label_trace)
+                    vob.parse_trace(pure_sequence, label_trace)
                 else:
-                    vob.parse_trace_without_neuter(pure_sequence,label_trace)
+                    vob.parse_trace_without_neuter(pure_sequence, label_trace)
             else:
                 if mode == MODE.WL:
                     if label != label_trace[-1]:
+                        # for spam we use payload_purifier, otherwise using sequence_purifier
                         pure_sequence = dataProcessor.sequence_purifier(sequence)
                         samples.append(pure_sequence)
                         indices.append(index)
@@ -80,11 +87,11 @@ class AbstractTraceExtractor():
                     indices.append(index)
                     traces_list.append(hn_trace)  # tensor to numpy
                     outputs_list.append(label_trace)
-                    assert len(pure_sequence)==len(hn_trace) and len(hn_trace)==len(label_trace)
+                    # assert len(pure_sequence) == len(hn_trace) and len(hn_trace) == len(label_trace)
                     predict_ground_list.append((label_trace[-1], label))
             index += 1
-            if index%1000==0:
-                print("Handling {}/{}".format(index,len(dataset)))
+            if index % 1000 == 0:
+                print("Handling {}/{}".format(index, len(dataset)))
 
         if mode == MODE.VOB:
             return vob
@@ -214,8 +221,8 @@ class AbstractTraceExtractor():
             memory = Memory(cachedir=cachedir, verbose=0)
             Aggmeans = AgglomerativeClustering(memory=memory, n_clusters=n_clusters,
                                                compute_full_tree=True).fit(vectorsList)
-            # labels = Aggmeans.labels_
-            return Aggmeans, cachedir
+            labels = Aggmeans.labels_
+            return labels, Aggmeans, cachedir
         else:
             pass
 

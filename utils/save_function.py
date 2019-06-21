@@ -1,6 +1,7 @@
 import os
 import pickle
 import pandas as pd
+import shutil
 
 def save_word_trace(save_path, words_traces, file_names):
     if not os.path.exists(save_path):
@@ -26,6 +27,9 @@ class DataPersistence:
                  test_rnn_prdct_grnd="test_rnn_prdct_grnd.pkl", ori_points="ori_points.pkl",
                  hn_trace_info="hn_trace_info.pkl", func="func.pkl"):
         self.root_path = os.path.abspath(root_path)
+        if os.path.exists(self.root_path):
+            shutil.rmtree(self.root_path)
+        os.makedirs(self.root_path)
         self.trace_path = os.path.join(root_path, trace)  # abstract traces like 0.txt
         self.word_traces_path = os.path.join(root_path, word_traces)
         self.test_word_traces_path = os.path.join(root_path, test_word_traces)
@@ -80,12 +84,15 @@ class DataPersistence:
         :param output_name: the name of the output.csv
         :return:
         """
+        path = os.path.dirname(output_name)
+        if not os.path.exists(path):
+            os.makedirs(path)
         if os.path.exists(output_name):
             df = pd.DataFrame(output_list)
             df.to_csv(output_name, mode='a', index=None, header=None)
         else:
             if len(output_list[0]) != len(self.table_head):
-                return Exception('Colum number not matched !')
+                raise Exception('Colum number not matched !')
             df = pd.DataFrame(output_list, columns=self.table_head)
             df.to_csv(output_name, index=None)
 

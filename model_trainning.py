@@ -585,7 +585,7 @@ def avg_length():
     # train_data_path = "/home/dgl/project/pfa-data-generator/data/pfa_expe3/test"
     # Total:99,average length :16.0606060606,alphabet size:936
 
-    train_data_path = "/home/dgl/project/pfa_extraction/data/imdb_for_dfa/dataset3"
+    train_data_path = "/home/dgl/project/pfa_extractor/data/imdb_for_dfa/dataset3"
     word2vec_model_path = "/home/dgl/project/pfa-data-generator/models/pretrained/GoogleNews-vectors-negative300.bin"
     stop_words_list_path = "/home/dgl/project/pfa-data-generator/data/stopwords.txt"
     word2vec_model = gensim.models.KeyedVectors.load_word2vec_format(word2vec_model_path, binary=True)
@@ -603,9 +603,9 @@ if __name__ == "__main__":
     avg_length()
 
 
-    # dataset1 = "/home/dgl/project/pfa_extraction/data/imdb_for_dfa"
-    # dataset2="/home/dgl/project/pfa_extraction/data/imdb_for_dfa/dataset2"
-    # dataset3="/home/dgl/project/pfa_extraction/data/imdb_for_dfa/dataset3"
+    # dataset1 = "/home/dgl/project/pfa_extractor/data/imdb_for_dfa"
+    # dataset2="/home/dgl/project/pfa_extractor/data/imdb_for_dfa/dataset2"
+    # dataset3="/home/dgl/project/pfa_extractor/data/imdb_for_dfa/dataset3"
     # model_save_name = "gru3.pkl"
     # train_imdb_for_exact_learning(dataset3,model_save_name)
 
@@ -614,7 +614,7 @@ if __name__ == "__main__":
     #
     # word2vec_model_path = "/home/dgl/project/pfa-data-generator/models/pretrained/GoogleNews-vectors-negative300.bin"
     # stop_words_list_path = "/home/dgl/project/pfa-data-generator/data/stopwords.txt"
-    # folder_path = "/home/dgl/project/pfa_extraction/data/imdb_for_dfa"
+    # folder_path = "/home/dgl/project/pfa_extractor/data/imdb_for_dfa"
     # word2vec_model = gensim.models.KeyedVectors.load_word2vec_format(word2vec_model_path, binary=True)
     # dataProcessor = IMDB_Data_Processor_DFA(word2vec_model, stop_words_list_path)
     # rnn.set_dataProcessor(dataProcessor)

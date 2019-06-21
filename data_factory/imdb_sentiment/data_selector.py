@@ -95,7 +95,7 @@ def make_data_for_DFA(dataset_no,total_size,valide_length):
     :return:
     '''
     random_seed = 20192025
-    save_path = "/home/dgl/project/pfa_extraction/data/imdb_for_dfa/dataset"+str(dataset_no)+"-len-"+str(valide_length)
+    save_path = "/home/dgl/project/pfa_extractor/data/imdb_for_dfa/dataset"+str(dataset_no)+"-len-"+str(valide_length)
     rnd_train_pos_path = os.path.join(save_path, "pos")
     rnd_train_neg_path = os.path.join(save_path, "neg")
 

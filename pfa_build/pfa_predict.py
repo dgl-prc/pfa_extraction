@@ -153,7 +153,7 @@ def get_prediction(pfa, persistence, trans, action_trace_paths, t_word_traces_pa
             if int(prdct) == int(grnd):
                 rnn_acc_check += 1.
     else:
-        prdct_grnd_list = pfa.load_prdct_grnd_pairs(persistence.prdct_grnd_path)
+        prdct_grnd_list = pfa.load_prdct_grnd_pairs(persistence.rnn_prdct_grnd_path)
         total_samples = len(action_trace_paths)
         for action_trace_path in action_trace_paths:
             _, tail = os.path.split(action_trace_path)
@@ -186,7 +186,7 @@ def get_prediction(pfa, persistence, trans, action_trace_paths, t_word_traces_pa
     return acc, fdlt, rnn_acc
 
 
-def get_pfa_acc_v2(pfa, used_traces_path, word_traces_path, persistence, t_word_traces_path=None, t_prdct_grnd_path=None):
+def get_pfa_acc_v2(pfa, used_traces_path, persistence, t_word_traces_path=None, t_prdct_grnd_path=None):
     ############
     # Build trans action matrix
     #############
@@ -206,14 +206,14 @@ def get_pfa_acc_v2(pfa, used_traces_path, word_traces_path, persistence, t_word_
         tail = tail.strip()
         # to be continued
         action_trace = pfa.load_action_trace(os.path.join(persistence.trace_path, tail))
-        word_trace = pfa.load_word_sequence(os.path.join(word_traces_path, tail))
+        word_trace = pfa.load_word_sequence(os.path.join(persistence.word_traces_path, tail))
         predict, accumu_prob, is_terminate, state_transition = pfa.predict_with_abs_trace(action_trace)
 
         if not is_terminate:
             assert len(state_transition) - len(word_trace) == 2
         else:
             print("trace path:{}".format(os.path.join(persistence.trace_path, tail)))
-            print("word_trace_path:{}".format(os.path.join(word_traces_path, tail)))
+            print("word_trace_path:{}".format(os.path.join(persistence.word_traces_path, tail)))
         for i, start_state in enumerate(state_transition):
             start_state = start_state[0]
             next_state = state_transition[i + 1][0]

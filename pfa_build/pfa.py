@@ -261,3 +261,46 @@ class PFA():
         with open(prdct_grnd_path,'r') as f:
             rnn_prdct_grnd = pickle.load(f)
         return rnn_prdct_grnd
+
+
+def build_pfa(input_traces_pfa, rnn_type, max_length, output_path, trace_path, variables_path):
+    '''
+    todo:
+    1. use jar to build pfa
+    2. recover pfa from the generated files
+    :param input_traces_pfa:
+    :return: pfa
+    '''
+    import shutil
+    from subprocess import call
+    if os.path.exists(output_path):
+        shutil.rmtree(output_path)
+    if os.path.exists(trace_path):
+        shutil.rmtree(trace_path)
+
+    #######################
+    # save pfa input trace
+    #######################
+    os.makedirs(trace_path)
+    for i, input_trace in enumerate(input_traces_pfa):
+        with open(os.path.join(trace_path, str(i) + '.txt'), 'w') as f:
+            f.write('state output\n')
+            for state, output in input_trace:
+                f.write("{} {}\n".format(state, output))
+        i += 1
+
+    model_name = rnn_type
+    # .pm shows the state transformation route with responding probability
+    pm_file_path = os.path.join(output_path, model_name + str(max_length) + ".pm")
+    pfa_label_path = os.path.join(output_path, model_name + str(max_length) + "_label.txt")
+    actual_used_abs_trace = os.path.join(output_path, "used_trace_list.txt")
+    print("Building PFA with JAR....")
+    rstcode = call(["bash", "../shell/learn_with_java.sh", model_name, trace_path, output_path, variables_path,
+                    str(max_length)])  # java: command not found
+    if rstcode > 0:
+        print("Fail to Building PFA with JAR")
+        return
+
+    pfa = PFA(pm_file_path, pfa_label_path, None)
+
+    return pfa, actual_used_abs_trace
