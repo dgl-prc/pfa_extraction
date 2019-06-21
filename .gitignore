@@ -11,7 +11,7 @@ __pycache__/
 *$py.class
 
 # C extensions
-*.so
+rnn_models/pretrained/GoogleNews-vectors-negative300.bin
 
 # Distribution / packaging
 .Python
