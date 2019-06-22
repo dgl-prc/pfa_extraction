@@ -34,7 +34,7 @@ class MODE():
 
 class AbstractTraceExtractor():
 
-    def collect_hidden_state_seq(self, rnn, dataset, dataProcessor, input_dim, use_cuda=False, mode=MODE.NORMAL,
+    def collect_hidden_state_seq(self, rnn, dataset, dataProcessor, input_dim, use_cuda=True, mode=MODE.NORMAL,
                                  with_neuter=True):
         '''
         :param rnn:

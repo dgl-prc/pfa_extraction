@@ -19,7 +19,8 @@ class TraceProcessor:
         self.ori_points, self.ori_traces_size_list = self.extractor.tracesList2vectorsList(self.traces_list)
 
     def init_kmeans_refine_parttition(self, n_cluster):
-        self.labels, self.cluster_centers, self.kmeans = self.extractor.kmeans_state_partition(self.ori_points, n_cluster)
+        self.flatten_traces()
+        self.labels, self.cluster_centers, self.hier_cluster = self.extractor.kmeans_state_partition(self.ori_points, n_cluster)
         self.cluster_model = AdditiveKMeans(self.hier_cluster)
 
     def init_hier_refine_parttiion(self, n_cluster):
@@ -72,7 +73,7 @@ class TraceProcessor:
         # to get the points to be refined
         toRefinedPoints = self.ori_points[np.where(old_labels == spurious_cluster)]
         _, cluster_centers, _ = self.extractor.kmeans_state_partition(toRefinedPoints, 2, n_init)
-        self.cluster_model.cluster_split(spurious_cluster, cluster_centers)
+        self.cluster_model.center_split(spurious_cluster, cluster_centers)
         clustering_labels = self.cluster_model.predict(self.ori_points)
         self.labels = clustering_labels
         input_traces_pfa = self.get_pfa_input_trace(null_added)

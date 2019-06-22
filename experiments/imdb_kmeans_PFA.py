@@ -40,11 +40,11 @@ if __name__ == '__main__':
     stop_words_list_path = '../data/imdb/stopwords.txt'
     max_iters = 20
     extractor = AbstractTraceExtractor()
-    data_processor = IMDB_Data_Processor()
+    data_processor = IMDB_Data_Processor(word2vec_model, stop_words_list_path)
     output_list = []
     for rnn_type in [MTYPE_GRU, MTYPE_LSTM]:
         print('==============RNN:{}=====DATA:{}================'.format(rnn_type, data))
-        model_path = os.path.join(models_root, models_type[rnn_type], models_type[rnn_type])
+        model_path = os.path.join(models_root, rnn_type, models_type[rnn_type])
         output_path = os.path.join(pfa_save_root, 'pfa_expe3')
 
         print('=====================pfa learning with hierarchical cluster to start!===================')
@@ -70,7 +70,7 @@ if __name__ == '__main__':
             output_list.append([data, rnn_type, deepth, acc, fdlt, rnn_acc, elasped]); deepth += 1
             input_traces_pfa = trace_processor.kmeans_input_update(pfa, used_traces_path,
                                                                         persistence.trace_path)
-        persistence.save_output(output_list, '../storage/bp/outcome/bp_hier_refine' + rnn_type)
+        persistence.save_output(output_list, '../storage/imdb/outcome/expe_3/imdb_kmeans_refine' + rnn_type)
 
 
 
