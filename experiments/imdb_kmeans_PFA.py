@@ -68,7 +68,7 @@ if __name__ == '__main__':
             elasped = time.time_counter()
             print elasped, deepth
             output_list.append([data, rnn_type, deepth, acc, fdlt, rnn_acc, elasped]); deepth += 1
-            input_traces_pfa = trace_processor.hier_refine_input_update(pfa, used_traces_path,
+            input_traces_pfa = trace_processor.kmeans_input_update(pfa, used_traces_path,
                                                                         persistence.trace_path)
         persistence.save_output(output_list, '../storage/bp/outcome/bp_hier_refine' + rnn_type)
 

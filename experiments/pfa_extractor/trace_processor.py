@@ -65,8 +65,19 @@ class TraceProcessor:
         input_traces_pfa = self.get_pfa_input_trace(null_added)
         return input_traces_pfa
 
-    def kmeans_input_update(self):
-        pass
+    def kmeans_input_update(self, pfa, used_traces_path, trace_path, n_init=10, null_added=False):
+        # to get the cluster number to be split
+        spurious_cluster = get_spurious_cluster(pfa, used_traces_path, trace_path)
+        old_labels = self.cluster_model.predict(self.ori_points)
+        # to get the points to be refined
+        toRefinedPoints = self.ori_points[np.where(old_labels == spurious_cluster)]
+        _, cluster_centers, _ = self.extractor.kmeans_state_partition(toRefinedPoints, 2, n_init)
+        self.cluster_model.cluster_split(spurious_cluster, cluster_centers)
+        clustering_labels = self.cluster_model.predict(self.ori_points)
+        self.labels = clustering_labels
+        input_traces_pfa = self.get_pfa_input_trace(null_added)
+        return input_traces_pfa
+
 
     def tmp_clear(self):
         if os.path.exists(self.cluster_model.cachedir):
