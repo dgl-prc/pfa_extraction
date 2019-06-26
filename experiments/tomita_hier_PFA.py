@@ -4,7 +4,7 @@ from utils.logger import Logger
 from utils.save_function import *
 from utils.constant import *
 from utils.time_util import *
-from data_factory.bp.bp_processor import *
+from data_factory.tomita.tomita_processor import *
 from pfa_extractor.trace_processor import *
 from pfa_build.abs_trace_extractor import AbstractTraceExtractor
 from pfa_build.pfa import build_pfa
@@ -13,25 +13,25 @@ import os
 
 
 if __name__ == '__main__':
-    sys.stdout = Logger('./logs/bp/bp_hier_out.log', sys.stdout)
-    sys.stderr = Logger('./logs/bp/bp_hier_err.log', sys.stderr)
+    sys.stdout = Logger('./logs/tomita/tomita_hier_out.log', sys.stdout)
+    sys.stderr = Logger('./logs/tomita/tomita_hier_err.log', sys.stderr)
     variables_path = './variables.txt'
-    root_path = '../storage/bp/traces_data/hier'
+    root_path = '../storage/tomita/traces_data/hier'
     max_deepth = 20
     n_init = 10
     train_size = 500
     random_seed = 5566
     k_cluster = 2
-    input_dim = 29
+    input_dim = 3
     max_length = 60000
-    pfa_save_root = '../storage/bp/pfa_construction/hier'
-    models_root = '../rnn_models/pretrained/bp'
-    data_root = '../data/bp'
-    models_type = {MTYPE_GRU:'gru-bp.pkl', MTYPE_LSTM:'lstm-bp.pkl'}
+    pfa_save_root = '../storage/tomita/pfa_construction/hier'
+    models_root = '../rnn_models/pretrained/tomita'
+    data_root = '../data/tomita/training'
+    models_type = {MTYPE_GRU:'test-gru-tomita1.pkl', MTYPE_LSTM:'test-lstm-tomita1.pkl'}
     max_iters = 20
-    data = 'bp.pkl'
+    data = 'tomita1.pkl'
     extractor = AbstractTraceExtractor()
-    data_processor = BPProcessor()
+    data_processor = TomitaDataProcessor()
     output_list = []
     for rnn_type in [MTYPE_GRU, MTYPE_LSTM]:
         print('==============RNN:{}=====DATA:{}================'.format(rnn_type, data))

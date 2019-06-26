@@ -4,52 +4,60 @@ from utils.logger import Logger
 from utils.save_function import *
 from utils.constant import *
 from utils.time_util import *
-from data_factory.bp.bp_processor import *
+from data_factory.imdb_sentiment.imdb_data_process import *
 from pfa_extractor.trace_processor import *
 from pfa_build.abs_trace_extractor import AbstractTraceExtractor
 from pfa_build.pfa import build_pfa
 from pfa_build.pfa_predict import *
 import os
+import gensim
 
 
 if __name__ == '__main__':
-    sys.stdout = Logger('./logs/bp/bp_hier_refine_out.log', sys.stdout)
-    sys.stderr = Logger('./logs/bp/bp_hier_refine_err.log', sys.stderr)
+    sys.stdout = Logger('./logs/imdb/imdb_hier_refine_out.log', sys.stdout)
+    sys.stderr = Logger('./logs/imdb/imdb_hier_refine_err.log', sys.stderr)
     variables_path = './variables.txt'
-    root_path = '../storage/bp/traces_data/hier_refine'
-    max_deepth = 20
+    root_path = '../storage/imdb/traces_data/hier_refine'
+
+    print('loading word2vec model....')
+    word2vec_model_path = "../rnn_models/pretrained/GoogleNews-vectors-negative300.bin"
+    word2vec_model = gensim.models.KeyedVectors.load_word2vec_format(
+        word2vec_model_path, binary=True)
+
+    max_deepth = 10
     n_init = 10
     train_size = 500
-    random_seed = 5566
+    random_seed = 11921002
     k_cluster = 2
-    input_dim = 29
+    input_dim = 300
     max_length = 60000
-    pfa_save_root = '../storage/bp/pfa_construction/hier_refine'
-    models_root = '../rnn_models/pretrained/bp'
-    data_root = '../data/bp'
-    models_type = {MTYPE_GRU:'gru-bp.pkl', MTYPE_LSTM:'lstm-bp.pkl'}
+    pfa_save_root = '../storage/imdb/pfa_construction/hier_refine'
+    models_root = '../rnn_models/pretrained/imdb_dfa'
+    data_path = '../data/imdb/pfa_expe3/test'
+    data = 'pfa_expe3'
+    models_type = {MTYPE_GRU:'pfa_expe3-train_acc-0.953-test_acc-0.853.pkl',
+                   MTYPE_LSTM:'pfa_expe3-train_acc-0.9112-test_acc-0.834.pkl'}
+    stop_words_list_path = '../data/imdb/stopwords.txt'
     max_iters = 20
-    data = 'bp.pkl'
     extractor = AbstractTraceExtractor()
-    data_processor = BPProcessor()
+    data_processor = IMDB_Data_Processor(word2vec_model, stop_words_list_path)
     output_list = []
     for rnn_type in [MTYPE_GRU, MTYPE_LSTM]:
         print('==============RNN:{}=====DATA:{}================'.format(rnn_type, data))
-        train_path = os.path.join(data_root, data)
-        model_path = os.path.join(models_root, models_type[rnn_type])
-        output_path = os.path.join(pfa_save_root, data.split('.')[0])
+        model_path = os.path.join(models_root, rnn_type, models_type[rnn_type])
+        output_path = os.path.join(pfa_save_root, 'pfa_expe3')
 
         print('=====================pfa learning with hierarchical cluster to start!===================')
         persistence = DataPersistence(os.path.join(root_path, rnn_type))
-        train_data = data_processor.load_data(train_path)
+        train_data = data_processor.load_data(data_path, random_seed=random_seed, data_size=train_size)
 
         with open(model_path, 'r') as f:
-            rnn = pickle.load(f).cuda()
+            rnn = pickle.load(f)
         print('Doing abstract initial with k={}....'.format(k_cluster))
         time = Time()
         trace_processor = TraceProcessor(extractor, rnn, train_data, data_processor, input_dim)
         trace_processor.init_hier_refine_parttiion(k_cluster)
-        input_traces_pfa = trace_processor.get_pfa_input_trace(null_added=True)
+        input_traces_pfa = trace_processor.get_pfa_input_trace()
         persistence.save_train_data(*(trace_processor.get_train_data()))
         deepth = 2
         while deepth <= max_deepth:
@@ -61,8 +69,8 @@ if __name__ == '__main__':
             print elasped, deepth
             output_list.append([data, rnn_type, deepth, acc, fdlt, rnn_acc, elasped]); deepth += 1
             input_traces_pfa = trace_processor.hier_refine_input_update(pfa, used_traces_path,
-                                                                        persistence.trace_path, null_added=True)
-        persistence.save_output(output_list, '../storage/bp/outcome/bp_hier_refine' + rnn_type)
+                                                                        persistence.trace_path)
+        persistence.save_output(output_list, '../storage/imdb/outcome/expe_3/imdb_hier_refine' + rnn_type)
 
 
 
