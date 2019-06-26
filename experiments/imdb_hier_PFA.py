@@ -24,7 +24,7 @@ if __name__ == '__main__':
     word2vec_model = gensim.models.KeyedVectors.load_word2vec_format(
         word2vec_model_path, binary=True)
 
-    max_deepth = 3
+    max_deepth = 20
     n_init = 10
     train_size = 500
     random_seed = 11921002
@@ -70,7 +70,7 @@ if __name__ == '__main__':
             output_list.append([data, rnn_type, deepth, acc, fdlt, rnn_acc, elasped]); deepth += 1
             input_traces_pfa = trace_processor.hier_input_update()
         trace_processor.tmp_clear()
-        persistence.save_output(output_list, '../storage/imdb/outcome/expe_3/imdb_hier' + rnn_type)
+        persistence.save_output(output_list, '../storage/imdb/outcome/expe_3/imdb_hier_' + rnn_type)
 
 
 

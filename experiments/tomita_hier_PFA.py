@@ -62,7 +62,7 @@ if __name__ == '__main__':
             output_list.append([data, rnn_type, deepth, acc, fdlt, rnn_acc, elasped]); deepth += 1
             input_traces_pfa = trace_processor.hier_input_update(null_added=True)
         trace_processor.tmp_clear()
-        persistence.save_output(output_list, '../storage/bp/outcome/bp_hier_' + rnn_type)
+        persistence.save_output(output_list, '../storage/tomita/outcome/tomita1_hier_' + rnn_type)
 
 
 

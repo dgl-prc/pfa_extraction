@@ -114,7 +114,7 @@ class SPAM_Data_Processor():
             return True
         return False
 
-    def load_data(self, folder_path, random_seed=5566, return_file_name=False, data_size=2298):
+    def load_data(self, folder_path, random_seed=5566, return_file_name=False, data_size=2298, batch=None):
 
         sequence_list = []
         file_names = []
@@ -161,9 +161,14 @@ class SPAM_Data_Processor():
         random.shuffle(sequence_list)
         random.seed(random_seed)
         random.shuffle(file_names)
+        if batch:
+            list_len = 500
+            sequence_list = sequence_list[list_len*(batch-1): list_len*batch]
+            file_names = file_names[list_len*(batch-1): list_len*batch]
         if return_file_name:
             return sequence_list, file_names
         return sequence_list
+
 
 
 def extract_subject(filename):
