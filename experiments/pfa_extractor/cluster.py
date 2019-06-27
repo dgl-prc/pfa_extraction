@@ -26,6 +26,7 @@ class CustomAgglomerativeClustering(object):
         ori_points = np.array(ori_points)
         subCluster_index = np.where(self.labels == splitedCluster)
         subCluster_list = ori_points[subCluster_index]
+        if len(subCluster_list) < 1: return None
         predict_list = self.myClustering.fit_predict(subCluster_list)
         predict_list[np.where(predict_list == 0)] = splitedCluster
         predict_list[np.where(predict_list == 1)] = self.n_clusters

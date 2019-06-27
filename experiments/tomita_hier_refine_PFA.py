@@ -60,8 +60,12 @@ if __name__ == '__main__':
             elasped = time.time_counter()
             print elasped, deepth
             output_list.append([data, rnn_type, deepth, acc, fdlt, rnn_acc, elasped]); deepth += 1
-            input_traces_pfa = trace_processor.hier_refine_input_update(pfa, used_traces_path,
-                                                                        persistence.trace_path, null_added=True)
+            try:
+                input_traces_pfa = trace_processor.hier_refine_input_update(pfa, used_traces_path,
+                                                                            persistence.trace_path, null_added=True)
+            except Exception:
+                print 'refinement terminated!'
+                break
         persistence.save_output(output_list, '../storage/tomita/outcome/tomita1_hier_refine_' + rnn_type)
 
 

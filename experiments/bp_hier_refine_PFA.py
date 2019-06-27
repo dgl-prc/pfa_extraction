@@ -42,7 +42,6 @@ if __name__ == '__main__':
         print('=====================pfa learning with hierarchical cluster to start!===================')
         persistence = DataPersistence(os.path.join(root_path, rnn_type))
         train_data = data_processor.load_data(train_path)
-
         with open(model_path, 'r') as f:
             rnn = pickle.load(f).cuda()
         print('Doing abstract initial with k={}....'.format(k_cluster))
@@ -60,8 +59,12 @@ if __name__ == '__main__':
             elasped = time.time_counter()
             print elasped, deepth
             output_list.append([data, rnn_type, deepth, acc, fdlt, rnn_acc, elasped]); deepth += 1
-            input_traces_pfa = trace_processor.hier_refine_input_update(pfa, used_traces_path,
-                                                                        persistence.trace_path, null_added=True)
+            try:
+                input_traces_pfa = trace_processor.hier_refine_input_update(pfa, used_traces_path,
+                                                                            persistence.trace_path, null_added=True)
+            except Exception:
+                print 'refinement terminated!'
+                break
         persistence.save_output(output_list, '../storage/bp/outcome/bp_hier_refine_' + rnn_type)
 
 

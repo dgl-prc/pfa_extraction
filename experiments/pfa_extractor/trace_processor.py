@@ -61,6 +61,7 @@ class TraceProcessor:
 
     def hier_refine_input_update(self, pfa, used_traces_path, trace_path, null_added=False):
         spurious_cluster = get_spurious_cluster(pfa, used_traces_path, trace_path)
+        if spurious_cluster is None: raise Exception('the samples cannot be separated !')
         clustering_labels = self.cluster_model.cluster_split(self.ori_points, spurious_cluster)
         self.labels = clustering_labels
         input_traces_pfa = self.get_pfa_input_trace(null_added)
