@@ -1,7 +1,7 @@
 import torch.nn as nn
 import torch.nn.functional as F
 import torch
-from my_module import *
+from models.my_module import *
 from torch.nn.utils.rnn import PackedSequence
 import numpy as np
 

@@ -1,24 +1,12 @@
-
 import os
 
-
-# TODO: move this funciton to pfa class
-
-
-
-
-
-
-# TODO: move to PFA
-
-
-def test_with_word_trace(pfa, trans, t_word_traces_path=None, t_prdct_grnd_path=None):
+def test_with_word_trace(pfa, trans, persistence):
     terminate_count = 0
     acc_count = 0
     fdlt_count = 0
     rnn_acc_check = 0
-
-    prdct_grnd_list = pfa.load_prdct_grnd_pairs(t_prdct_grnd_path)
+    t_word_traces_path = persistence.word_traces_path
+    prdct_grnd_list = pfa.load_prdct_grnd_pairs(persistence.rnn_prdct_grnd_path)
     total_samples = len(prdct_grnd_list)
     for word_traces_file in os.listdir(t_word_traces_path):
         word_trace = pfa.load_word_sequence(os.path.join(t_word_traces_path, word_traces_file))
@@ -27,7 +15,7 @@ def test_with_word_trace(pfa, trans, t_word_traces_path=None, t_prdct_grnd_path=
         #############
         sample_idx = int(word_traces_file.split(".")[0])
         prdct, grnd = prdct_grnd_list[sample_idx]  # get the RNN prediction and the ground truth.
-        pfa_prdct, is_terminate, trans_path, trans_prob = predict_word_trace_v2(pfa, word_trace, trans)
+        pfa_prdct, path_prob, is_terminate, state_trans_path = pfa.predict_word_trace(word_trace, trans)
         if is_terminate:
             terminate_count += 1
             # print("trace_file:{}".format(word_traces_file))
@@ -49,7 +37,7 @@ def test_with_word_trace(pfa, trans, t_word_traces_path=None, t_prdct_grnd_path=
     return acc, fdlt, rnn_acc
 
 
-def test_with_absActionTrace(pfa, persistence, trans, action_trace_paths):
+def test_with_absActionTrace(pfa,persistence,action_trace_paths):
     '''
     :param pfa:
     :param persistence:
@@ -78,11 +66,8 @@ def test_with_absActionTrace(pfa, persistence, trans, action_trace_paths):
         #################################################################################################
         # what the fuck? Actually, the result is obtained according to word trace instead of action trace
         ##################################################################################################
-        word_trace = pfa.load_word_sequence(os.path.join(persistence.word_traces_path, tail))
-        #############
-        # DIFFERENCE2:
-        #############
-        pfa_prdct, is_terminate, trans_path, trans_prob = predict_word_trace_v2(pfa, word_trace, trans)
+        action_trace = pfa.load_action_trace(action_trace_path)
+        pfa_prdct, path_prob, is_terminate, state_trans_path = pfa.predict_with_abs_trace(action_trace=action_trace)
         if is_terminate:
             terminate_count += 1
             # print("trace_file:{}".format(tail))
@@ -104,7 +89,7 @@ def test_with_absActionTrace(pfa, persistence, trans, action_trace_paths):
     return acc, fdlt, rnn_acc
 
 
-def get_pfa_acc_v2(pfa, used_traces_path, persistence, t_word_traces_path=None, t_prdct_grnd_path=None):
+def test_pfa_acc(pfa, used_traces_path, persistence, t_word_traces_path=None, t_prdct_grnd_path=None):
     '''
 
     :param pfa:
@@ -114,6 +99,8 @@ def get_pfa_acc_v2(pfa, used_traces_path, persistence, t_word_traces_path=None, 
     :param t_prdct_grnd_path:
     :return:
     '''
+    # TODO: replae the following code with pfa.make_trans_matrix
+
     ###########################
     # Build trans action matrix
     ###########################
@@ -125,6 +112,7 @@ def get_pfa_acc_v2(pfa, used_traces_path, persistence, t_word_traces_path=None, 
         trans.append(i_row)
     with open(used_traces_path, 'r') as f:
         action_trace_paths = f.readlines()
+    action_trace_paths = [action_trace_path.strip() for action_trace_path in action_trace_paths]
     exception_count = 0
     for action_trace_path in action_trace_paths:
         if exception_count > 10:
@@ -132,7 +120,7 @@ def get_pfa_acc_v2(pfa, used_traces_path, persistence, t_word_traces_path=None, 
         _, tail = os.path.split(action_trace_path)
         tail = tail.strip()
         # to be continued
-        action_trace = pfa.load_action_trace(os.path.join(persistence.trace_path, tail))
+        action_trace = pfa.load_action_trace(os.path.join(persistence.action_traces_path, tail))
         word_trace = pfa.load_word_sequence(os.path.join(persistence.word_traces_path, tail))
         predict, accumu_prob, is_terminate, state_transition = pfa.predict_with_abs_trace(action_trace)
 
@@ -155,4 +143,7 @@ def get_pfa_acc_v2(pfa, used_traces_path, persistence, t_word_traces_path=None, 
             if i + 1 == len(state_transition) - 1:
                 break
 
-    return test_with_absActionTrace(pfa, persistence, trans, action_trace_paths)
+    trans = pfa.make_words_trans_matrix(used_traces_path=used_traces_path, trace_path=persistence.action_traces_path,
+                                word_traces_path=persistence.word_traces_path)
+
+    return test_with_absActionTrace(pfa, persistence, action_trace_paths),test_with_word_trace(pfa,trans,persistence)

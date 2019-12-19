@@ -8,7 +8,7 @@ from data_factory.imdb_sentiment.imdb_data_process import *
 from pfa_extractor.trace_processor import *
 from pfa_build.abs_trace_extractor import AbstractTraceExtractor
 from pfa_build.pfa import build_pfa
-from pfa_build.pfa_predict import *
+from pfa_build.test_acc_pfa import *
 import os
 import gensim
 

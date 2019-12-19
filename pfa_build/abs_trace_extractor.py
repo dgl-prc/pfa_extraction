@@ -2,16 +2,9 @@ from sklearn.cluster import KMeans, AgglomerativeClustering
 from tempfile import mkdtemp
 from joblib import Memory
 import numpy as np
-import pickle
-# from data_process.name_classifiction.rnnexamples import DataProcessor
-import string
 import os
-from data_factory.imdb_sentiment.imdb_data_process import IMDB_Data_Processor
 from data_factory.imdb_sentiment.vocabulary import Vob
-from utils.time_util import current_timestamp
-from utils.constant import *
 import pickle
-from pfa_build.pfa import PFA
 import torch
 '''
 using k-means to clusteing

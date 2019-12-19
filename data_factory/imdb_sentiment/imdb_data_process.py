@@ -58,6 +58,7 @@ class IMDB_Data_Processor():
         self.word2vec_model = word2vec_model
         self.reg = '[\-|\.|,|:|!|;|\"]*\s+|[\.]?[\s]?\<br /\>\<br /\>|\.|[\s\"]?'
         self.stop_words_list = []
+
         with open(stop_words_path, 'r') as f:
             for line in f.readlines():
                 self.stop_words_list.append(line.strip())
@@ -91,7 +92,6 @@ class IMDB_Data_Processor():
                 try:
                     vector = self.word2vec_model[word]
                 except KeyError as e:
-                    # print("{} not in vocabulary".format(word))
                     continue
                 sequence_tensor[0][li] = torch.tensor(vector)
             return sequence_tensor

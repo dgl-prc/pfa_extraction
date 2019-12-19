@@ -30,7 +30,7 @@ class DataPersistence:
         if os.path.exists(self.root_path):
             shutil.rmtree(self.root_path)
         os.makedirs(self.root_path)
-        self.trace_path = os.path.join(root_path, trace)  # abstract traces like 0.txt
+        self.action_traces_path = os.path.join(root_path, trace)  # abstract traces like 0.txt
         self.word_traces_path = os.path.join(root_path, word_traces)
         self.test_word_traces_path = os.path.join(root_path, test_word_traces)
         self.rnn_prdct_grnd_path = os.path.join(root_path, rnn_prdct_grnd)
@@ -96,4 +96,20 @@ class DataPersistence:
             df = pd.DataFrame(output_list, columns=self.table_head)
             df.to_csv(output_name, index=None)
 
+    def save_pfa_input_trace(self,input_traces_pfa):
+
+        if os.path.exists(self.action_traces_path):
+            shutil.rmtree(self.action_traces_path)
+        ##############################
+        # save pfa input trace
+        ##############################
+        os.makedirs(self.action_traces_path)
+        for i, input_trace in enumerate(input_traces_pfa):
+            with open(os.path.join(self.action_traces_path, str(i) + '.txt'), 'w') as f:
+                f.write('state output\n')
+                for state, output in input_trace:
+                    f.write("{} {}\n".format(state, output))
+            i += 1
+
+        return self.action_traces_path
 

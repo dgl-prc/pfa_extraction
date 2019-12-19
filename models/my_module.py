@@ -1,5 +1,6 @@
 
 import torch.nn as nn
+import torch
 
 '''
         This model enable both batch training and no-batch training.
@@ -43,7 +44,7 @@ class MyModule(nn.Module):
         :return: pr_dstr:(batch,num_class)
         '''
         logits = self.h2o(hidden_states)
-        pr_dstr = self.softmax(logits)
+        pr_dstr = torch.softmax(logits)
         return pr_dstr
 
 
