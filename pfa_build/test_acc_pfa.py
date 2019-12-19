@@ -1,6 +1,21 @@
 import os
 
-def test_with_word_trace(pfa, trans, persistence):
+'''
+The following codes are derived based on function 'refinePFA' which supports two types of prediction strategy. 
+'''
+
+
+def predict_words(pfa, trans, persistence):
+    ''' make prediction with word trace.
+
+    In this fashion, we make prediction with the word trace directly,i.e, we can give a prediction of sentence without the information of RNN.
+
+    Parameters
+    -----------
+    pfa: an instance of PFA class.
+    trans:
+    persistence:
+    '''
     terminate_count = 0
     acc_count = 0
     fdlt_count = 0
@@ -37,15 +52,16 @@ def test_with_word_trace(pfa, trans, persistence):
     return acc, fdlt, rnn_acc
 
 
-def test_with_absActionTrace(pfa,persistence,action_trace_paths):
-    '''
-    :param pfa:
-    :param persistence:
-    :param trans:
-    :param action_trace_paths:
-    :param t_word_traces_path:
-    :param t_prdct_grnd_path:
-    :return:
+def predict_actions(pfa, persistence, action_trace_paths):
+    ''' make prediction with the abstracted action trace.
+
+    In this fashion, we make prediction with the abstract action trace,which is obtained with the hidden state vectors of RNN.
+
+    Parameters
+    -----------
+    pfa: an instance of PFA class.
+    action_trace_paths:
+    persistence:
     '''
     #########
     # predict
@@ -144,6 +160,6 @@ def test_pfa_acc(pfa, used_traces_path, persistence, t_word_traces_path=None, t_
                 break
 
     trans = pfa.make_words_trans_matrix(used_traces_path=used_traces_path, trace_path=persistence.action_traces_path,
-                                word_traces_path=persistence.word_traces_path)
+                                        word_traces_path=persistence.word_traces_path)
 
-    return test_with_absActionTrace(pfa, persistence, action_trace_paths),test_with_word_trace(pfa,trans,persistence)
+    return predict_actions(pfa, persistence, action_trace_paths), predict_words(pfa, trans, persistence)
