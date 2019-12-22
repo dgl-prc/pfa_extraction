@@ -23,7 +23,6 @@ def save_word_trace(save_path, words_traces, file_names):
             for word in word_trace:
                 f.write("{}\n".format(word))
 
-
 def save_state_trans(save_path, stateTranslist, file_names):
     if not os.path.exists(save_path):
         os.makedirs(save_path)

@@ -1,6 +1,5 @@
 import time
 import datetime
-import save_function
 
 def sec2str(timestamp, format):
     '''
@@ -17,6 +16,9 @@ def current_timestamp():
     timestamp = time.time()
     return sec2str(timestamp, "%Y-%m-%d %H:%M:%S")
 
+def folder_timestamp():
+    timestamp = time.time()
+    return sec2str(timestamp, "%Y%m%d%H%M%S")
 
 class Time():
     def __init__(self):
@@ -31,10 +33,10 @@ class Time():
         return self.time_elapsed
 
 
-if __name__ == "__main__":
-    print current_timestamp()
-    print datetime.datetime.now()
-    time = Time()
-    for i in range(100000):
-        continue
-    print time.time_counter()
+# if __name__ == "__main__":
+#     print current_timestamp()
+#     print datetime.datetime.now()
+#     time = Time()
+#     for i in range(100000):
+#         continue
+#     print time.time_counter()
