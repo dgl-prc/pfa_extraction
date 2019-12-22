@@ -1,7 +1,9 @@
+import sys
+sys.path.append("../../")
 import torch.nn as nn
 import torch.nn.functional as F
 import torch
-from my_module import *
+from rnn_models.rnn_arch.my_module import *
 from torch.nn.utils.rnn import PackedSequence
 import numpy as np
 
